@@ -47,7 +47,7 @@ Include an Atom Index
    >>> def mol_with_atom_index(mol):
           atoms = mol.GetNumAtoms()
           for idx in range(atoms):
-               mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str( mol.GetAtomWithIdx(idx).GetIdx()))
+               mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
           return mol
    
    >>> # Test in a kinase inhibitor
@@ -66,6 +66,8 @@ Include an Atom Index
 License
 *******
 
+.. image:: images/picture_5.png
+
 This document is copyright (C) 2007-2020 by Greg Landrum and Vincent Scalfani.
 
 This work is licensed under the Creative Commons Attribution-ShareAlike 4.0 License.
@@ -73,5 +75,3 @@ To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/
 
 
 The intent of this license is similar to that of the RDKit itself. In simple words: “Do whatever you want with it, but please give us some credit.”
-
-
