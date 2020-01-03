@@ -45,21 +45,21 @@ Include an Atom Index
    '2019.09.2'
 
    >>> def mol_with_atom_index(mol):
-          atoms = mol.GetNumAtoms()
-          for idx in range(atoms):
-               mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
-          return mol
+   ...     atoms = mol.GetNumAtoms()
+   ...     for idx in range(atoms):
+   ...         mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
+   ...     return mol
    
-   >>> # Test in a kinase inhibitor
-       mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65")
+   # Test in a kinase inhibitor
+   >>> mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65")
        
-   >>> # Default
-       mol
+   # Default
+   >>> mol
 
 .. image:: images/RDKitCB_0_im0.png
 
-   >>> # With index
-       mol_with_atom_index(mol)
+   # With index
+   >>> mol_with_atom_index(mol)
 
 .. image:: images/RDKitCB_0_im1.png
 
