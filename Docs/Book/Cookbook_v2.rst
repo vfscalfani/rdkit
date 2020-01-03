@@ -1,7 +1,7 @@
 RDKit Cookbook v2
 %%%%%%%%%%%%%%%%%
 
-.. contents:: :local: Table of Contents
+.. contents:: :local:
 
 Introduction
 ************
@@ -28,13 +28,14 @@ Drawing Molecules (in a Jupyter Environment)
 Include an Atom Index
 =========
 
-|**Author:** Takayuki Serizawa
-|**Source:** `<https://iwatobipen.wordpress.com/2017/02/25/draw-molecule-with-atom-index-in-rdkit/>`_
-|**Index ID#:** RDKitCB_0
-|**Summary:** Draw a molecule with index numbers.
+**Author:** Takayuki Serizawa
 
-.. code-block:: python
-   :emphasize-lines: 9,10,11,12,13
+**Source:** `<https://iwatobipen.wordpress.com/2017/02/25/draw-molecule-with-atom-index-in-rdkit/>`_
+
+**Index ID#:** RDKitCB_0
+
+**Summary:** Draw a molecule with index numbers.
+
    >>> from rdkit import Chem
    >>> from rdkit.Chem.Draw import IPythonConsole
    >>> from rdkit.Chem import Draw
