@@ -35,7 +35,9 @@ Include an Atom Index
 **Index ID#:** RDKitCB_0
 
 **Summary:** Draw a molecule with index numbers.
-::
+
+.. doctest::
+
    >>> from rdkit import Chem
    >>> from rdkit.Chem.Draw import IPythonConsole
    >>> from rdkit.Chem import Draw
@@ -44,19 +46,23 @@ Include an Atom Index
    >>> rdkit.__version__
    '2019.09.2'
 
-.. code-block:: python
+.. doctest::
    
-   def mol_with_atom_index(mol):
-        atoms = mol.GetNumAtoms()
-        for idx in range(atoms):
-            mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
-        return mol
-::  
+   >>> def mol_with_atom_index(mol):
+           atoms = mol.GetNumAtoms()
+           for idx in range(atoms):
+               mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
+           return mol
+
+.. doctest::
+
    >>> mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65") # Test in a kinase inhibitor
    >>> mol # Default
 
 .. image:: images/RDKitCB_0_im0.png
-::
+
+.. doctest::
+
    >>> mol_with_atom_index(mol) # With index
 
 .. image:: images/RDKitCB_0_im1.png
