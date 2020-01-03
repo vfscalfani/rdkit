@@ -56,14 +56,19 @@ Include an Atom Index
 
 .. doctest::
 
-   >>> mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65") # Test in a kinase inhibitor
-   >>> mol # Default
+   >>> # Test in a kinase inhibitor
+       mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65")
+
+.. code-block:: python    
+   >>> # Default
+       mol 
 
 .. image:: images/RDKitCB_0_im0.png
 
-.. doctest::
-
-   >>> mol_with_atom_index(mol) # With index
+.. code-block:: python
+  
+   >>> # With index
+       mol_with_atom_index(mol)
 
 .. image:: images/RDKitCB_0_im1.png
 
