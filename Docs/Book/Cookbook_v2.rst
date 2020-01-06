@@ -47,13 +47,10 @@ Drawing Molecules (in a Jupyter Environment)
 Include an Atom Index
 =====================
 
-**Author:** Takayuki Serizawa
-
-**Source:** `<https://iwatobipen.wordpress.com/2017/02/25/draw-molecule-with-atom-index-in-rdkit/>`_
-
-**Index ID#:** RDKitCB_0
-
-**Summary:** Draw a molecule with atom index numbers.
+| **Author:** Takayuki Serizawa
+| **Source:** `<https://iwatobipen.wordpress.com/2017/02/25/draw-molecule-with-atom-index-in-rdkit/>`_
+| **Index ID#:** RDKitCB_0
+| **Summary:** Draw a molecule with atom index numbers.
 
 .. doctest::
 
