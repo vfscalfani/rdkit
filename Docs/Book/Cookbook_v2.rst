@@ -27,9 +27,7 @@ source and authors. For now, we are including anything that seems useful and reu
 One of the first priorities of this document is to compile useful examples shared on the RDKit 
 mailing lists, as these can be difficult to discover. It will take some time, but we hope to expand 
 this document into 100s of examples. As the document grows, it may make sense to prioritize 
-examples included in the RDKit Cookbook v2 based on community demand. Another thought may be 
-to turn the Cookbook v2 into a micro-publishing opportunity for the RDKit Community; that is, 
-contributions to the RDKit Cookbook would be reviewed, and then assigned a unique DOI.
+examples included in the RDKit Cookbook v2 based on community demand.
 
 Feedback
 ========
@@ -59,8 +57,6 @@ Include an Atom Index
    >>> from rdkit.Chem import Draw
    >>> IPythonConsole.ipython_useSVG=False
    >>> import rdkit
-   >>> rdkit.__version__
-   '2019.09.2'
 
 .. doctest::
   
@@ -89,13 +85,10 @@ Include an Atom Index
 Black and White Molecules
 =====================
 
-**Author:** Greg Landrum
-
-**Source:** `<https://gist.github.com/greglandrum/d85d5693e57c306e30057ec4d4d11342>`_
-
-**Index ID#:** RDKitCB_1
-
-**Summary:** Draw a molecule in black and white.
+| **Author:** Greg Landrum
+| **Source:** `<https://gist.github.com/greglandrum/d85d5693e57c306e30057ec4d4d11342>`_
+| **Index ID#:** RDKitCB_1
+| **Summary:** Draw a molecule in black and white.
 
 .. doctest::
 
@@ -103,8 +96,6 @@ Black and White Molecules
    >>> from rdkit.Chem.Draw import IPythonConsole
    >>> from rdkit.Chem import Draw
    >>> import rdkit
-   >>> rdkit.__version__
-   '2019.09.2'
 
 .. doctest::
 
@@ -125,21 +116,16 @@ Black and White Molecules
 Highlight a Substructure in a Molecule
 =====================
 
-**Author:** Greg Landrum
-
-**Source:** `<https://gist.github.com/greglandrum/5d45b56afe75603b955103cdd0d8e038>`_
-
-**Index ID#:** RDKitCB_2
-
-**Summary:** Draw a molecule with a substructure highlight.
+| **Author:** Greg Landrum
+| **Source:** `<https://gist.github.com/greglandrum/5d45b56afe75603b955103cdd0d8e038>`_
+| **Index ID#:** RDKitCB_2
+| **Summary:** Draw a molecule with a substructure highlight.
 
 .. doctest::
 
    >>> from rdkit import Chem
    >>> from rdkit.Chem.Draw import IPythonConsole
    >>> import rdkit
-   >>> rdkit.__version__
-   '2019.09.2'
 
 .. doctest::
 
@@ -158,13 +144,10 @@ Rings, Aromaticity, and Kekulization
 Count Ring Systems
 =====================
 
-**Author:** Greg Landrum
-
-**Source:** `<https://gist.github.com/greglandrum/de1751a42b3cae54011041dd67ae7415>`_
-
-**Index ID#:** RDKitCB_3
-
-**Summary:** Count ring systems in a molecule
+| **Author:** Greg Landrum
+| **Source:** `<https://gist.github.com/greglandrum/de1751a42b3cae54011041dd67ae7415>`_
+| **Index ID#:** RDKitCB_3
+| **Summary:** Count ring systems in a molecule
 
 .. doctest::
 
@@ -208,6 +191,131 @@ Count Ring Systems
    <rdkit.Chem.rdchem.Mol object at 0x...>
 
 .. image:: images/RDKitCB_3_im0.png
+
+
+Writing Molecules
+*****************
+
+Kekule SMILES
+=============
+
+| **Author:** Paulo Tosco
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36893087/>`_
+| **Index ID#:** RDKitCB_4
+| **Summary:** Kekulize a molecule and write Kekule SMILES
+
+.. doctest::
+
+   >>> from rdkit import Chem
+   >>> smi = "CN1C(NC2=NC=CC=C2)=CC=C1"
+   >>> mol = Chem.MolFromSmiles(smi)
+   >>> Chem.MolToSmiles(mol) 
+   'Cn1cccc1Nc1ccccn1'
+   >>> Chem.Kekulize(mol)
+   >>> Chem.MolToSmiles(mol, kekuleSmiles=True)
+   'CN1C=CC=C1NC1=NC=CC=C1'
+
+Isomeric SMILES without isotopes
+================================
+
+| **Author:** Andrew Dalke
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36877847/>`_
+| **Index ID#:** RDKitCB_5
+| **Summary:** Write Isomeric SMILES without isotope information (i.e., only stereochemistry)
+
+.. doctest::
+
+   >>> from rdkit import Chem
+   >>> def MolWithoutIsotopesToSmiles(mol):
+   ...   atom_data = [(atom, atom.GetIsotope()) for atom in mol.GetAtoms()]
+   ...   for atom, isotope in atom_data:
+   ...       if isotope:
+   ...           atom.SetIsotope(0)
+   ...   smiles = Chem.MolToSmiles(mol)
+   ...   for atom, isotope in atom_data:
+   ...       if isotope:
+   ...          atom.SetIsotope(isotope)
+   ...   return smiles
+
+.. doctest::
+
+   >>> mol = Chem.MolFromSmiles("[19F][13C@H]([16OH])[35Cl]")
+   >>> MolWithoutIsotopesToSmiles(mol)
+   'O[C@@H](F)Cl'
+
+*N.B.* There are two limitations noted with this Isomeric SMILES without isotopes method 
+including with isotopic hydrogens, and a requirement to recalculate stereochemistry. 
+See the source discussion linked above for further explanation and examples.
+
+Reactions
+*********
+
+Reversing Reactions
+===================
+
+| **Author:** Greg Landrum
+| **Source:** `<https://gist.github.com/greglandrum/5ca4eebbe78f4d6d9b8cb03f401ad9cd>`_ and `<https://sourceforge.net/p/rdkit/mailman/message/36867857/>`_
+| **Index ID#:** RDKitCB_6
+| **Summary:** Decompose a reaction product into its reactants
+| **Note:** Example reaction from: Markus Hartenfeller, Martin Eberle, Peter Meier, Cristina Nieto-Oberhuber, Karl-Heinz Altmann, Gisbert Schneider, Edgar Jacoby, and Steffen Renner
+Journal of Chemical Information and Modeling 2011 51 (12), 3093-3098. DOI: 10.1021/ci200379p
+
+.. doctest::
+
+   >>> from rdkit import Chem
+   >>> from rdkit.Chem import AllChem
+   >>> from rdkit.Chem import Draw
+
+.. doctest::
+
+   >>> # Pictet-Spengler rxn
+   >>> rxn = AllChem.ReactionFromSmarts('[cH1:1]1:[c:2](-[CH2:7]-[CH2:8]-[NH2:9]):[c:3]:[c:4]:[c:5]:[c:6]:1.[#6:11]-[CH1;R0:10]=[OD1]>>[c:1]12:[c:2](-[CH2:7]-[CH2:8]-[NH1:9]-[C:10]-2(-[#6:11])):[c:3]:[c:4]:[c:5]:[c:6]:1')
+   >>> rxn # doctest: +ELLIPSIS
+   <rdkit.Chem.rdChemReactions.ChemicalReaction object at 0x...>
+
+.. image:: images/RDKitCB_6_im0.png
+
+.. doctest::
+
+   >>> rxn2 = AllChem.ChemicalReaction() 
+   >>> for i in range(rxn.GetNumReactantTemplates()):
+   ...     rxn2.AddProductTemplate(rxn.GetReactantTemplate(i))
+   1
+   2
+
+.. doctest::
+
+   >>> for i in range(rxn.GetNumProductTemplates()): 
+   ...     rxn2.AddReactantTemplate(rxn.GetProductTemplate(i))
+   1
+   >>> rxn2.Initialize()
+
+.. doctest::
+
+   >>> reacts = [Chem.MolFromSmiles(x) for x in ('NCCc1ccccc1','C1CC1C(=O)')]
+   >>> ps = rxn.RunReactants(reacts)
+   >>> ps0 = ps[0]
+   >>> for p in ps0:
+   ...     Chem.SanitizeMol(p)
+   rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
+   >>> Draw.MolsToGridImage(ps0) # doctest: +ELLIPSIS
+   <PIL.PngImagePlugin.PngImageFile image mode=RGB size=600x200 at 0x...>
+
+.. image:: images/RDKitCB_6_im1.png
+
+.. doctest::
+
+   >>> reacts = ps0
+   >>> rps = rxn2.RunReactants(reacts)
+   >>> rps0 = rps[0]
+   >>> for rp in rps0:
+   ...     Chem.SanitizeMol(rp)
+   rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
+   rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
+   >>> Draw.MolsToGridImage(rps0) # doctest: +ELLIPSIS
+   <PIL.PngImagePlugin.PngImageFile image mode=RGB size=600x200 at 0x...>
+
+.. image:: images/RDKitCB_6_im2.png
 
 License
 *******
