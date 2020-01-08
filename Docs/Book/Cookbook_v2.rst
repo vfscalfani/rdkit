@@ -70,11 +70,7 @@ Include an Atom Index
    # Test in a kinase inhibitor
    mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65")
    # Default
-   mol # doctest: +ELLIPSIS
-
-.. testouput::
-
-   <rdkit.Chem.rdchem.Mol object at 0x...>
+   mol
    
 .. image:: images/RDKitCB_0_im0.png
 
