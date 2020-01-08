@@ -1,13 +1,13 @@
 RDKit Cookbook v2
-%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%
 
 .. contents:: :local:
 
 Introduction
-************
+**************
 
 What is this?
-=============
+===============
 
 This document provides examples of how to carry out particular tasks using the RDKit functionality
 from Python. The contents have been contributed by the RDKit community, tested with the latest 
@@ -18,7 +18,7 @@ is written in reStructuredText, which supports automatic Sphinx doctests, allowi
 validation and maintenance of the RDKit Cookbook v2 code examples, where appropriate. 
 
 What gets included?
-===================
+=====================
 
 The examples included come from various online sources such as blogs, shared gists, and 
 the RDKit mailing lists.  Generally, only minimal editing is added to the examples for 
@@ -30,7 +30,7 @@ this document into 100s of examples. As the document grows, it may make sense to
 examples included in the RDKit Cookbook v2 based on community demand.
 
 Feedback
-========
+=========
 
 If you have suggestions for how to improve the Cookbook v2 and/or examples you would like 
 included, please contribute directly in the source document (the .rst file). The Index ID# 
@@ -40,23 +40,23 @@ you can also send Cookbook revision and and addition requests to the mailing lis
 
 
 Drawing Molecules (in a Jupyter Environment)
-*******
+**********************************************
 
 Include an Atom Index
-=====================
+======================
 
 | **Author:** Takayuki Serizawa
 | **Source:** `<https://iwatobipen.wordpress.com/2017/02/25/draw-molecule-with-atom-index-in-rdkit/>`_
 | **Index ID#:** RDKitCB_0
 | **Summary:** Draw a molecule with atom index numbers.
 
-.. doctest::
+.. testcode::
 
-   >>> from rdkit import Chem
-   >>> from rdkit.Chem.Draw import IPythonConsole
-   >>> from rdkit.Chem import Draw
-   >>> IPythonConsole.ipython_useSVG=False
-   >>> import rdkit
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+   from rdkit.Chem import Draw
+   IPythonConsole.ipython_useSVG=False
+   import rdkit
 
 .. doctest::
   
@@ -83,7 +83,7 @@ Include an Atom Index
 .. image:: images/RDKitCB_0_im1.png
 
 Black and White Molecules
-=====================
+==========================
 
 | **Author:** Greg Landrum
 | **Source:** `<https://gist.github.com/greglandrum/d85d5693e57c306e30057ec4d4d11342>`_
@@ -114,7 +114,7 @@ Black and White Molecules
 .. image:: images/RDKitCB_1_im1.png
 
 Highlight a Substructure in a Molecule
-=====================
+=======================================
 
 | **Author:** Greg Landrum
 | **Source:** `<https://gist.github.com/greglandrum/5d45b56afe75603b955103cdd0d8e038>`_
@@ -194,10 +194,10 @@ Count Ring Systems
 
 
 Writing Molecules
-*****************
+*******************
 
 Kekule SMILES
-=============
+==============
 
 | **Author:** Paulo Tosco
 | **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36893087/>`_
@@ -216,7 +216,7 @@ Kekule SMILES
    'CN1C=CC=C1NC1=NC=CC=C1'
 
 Isomeric SMILES without isotopes
-================================
+=================================
 
 | **Author:** Andrew Dalke
 | **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36877847/>`_
@@ -248,10 +248,10 @@ including with isotopic hydrogens, and a requirement to recalculate stereochemis
 See the source discussion linked above for further explanation and examples.
 
 Reactions
-*********
+***********
 
 Reversing Reactions
-===================
+=====================
 
 | **Author:** Greg Landrum
 | **Source:** `<https://gist.github.com/greglandrum/5ca4eebbe78f4d6d9b8cb03f401ad9cd>`_ and `<https://sourceforge.net/p/rdkit/mailman/message/36867857/>`_
@@ -318,7 +318,7 @@ Journal of Chemical Information and Modeling 2011 51 (12), 3093-3098. DOI: 10.10
 .. image:: images/RDKitCB_6_im2.png
 
 License
-*******
+********
 
 .. image:: images/picture_5.png
 
