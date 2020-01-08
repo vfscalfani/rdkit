@@ -38,8 +38,6 @@ is simply a way to track entries, new additions are sequentially numbered. Alter
 you can also send Cookbook revision and and addition requests to the mailing list:
 <rdkit-discuss@lists.sourceforge.net> (you will need to subscribe first).
 
-**Ignore the ..testcode:: and ..testoutput:: paragraph markup, these are for Sphinx document testing and are unfortunately displayed in GitHub rendered .rst files.**
-
 Drawing Molecules (in a Jupyter Environment)
 **********************************************
 
@@ -59,18 +57,23 @@ Include an Atom Index
    IPythonConsole.ipython_useSVG=False
    import rdkit
 
-.. doctest::
+.. testcode::
   
-   >>> def mol_with_atom_index(mol):
-   ...     atoms = mol.GetNumAtoms()
-   ...     for idx in range(atoms):
-   ...         mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
-   ...     return mol
+   def mol_with_atom_index(mol):
+       atoms = mol.GetNumAtoms()
+       for idx in range(atoms):
+           mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
+       return mol
 
-   >>> # Test in a kinase inhibitor
-   >>> mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65")
-   >>> # Default
-   >>> mol # doctest: +ELLIPSIS
+.. testcode::
+
+   # Test in a kinase inhibitor
+   mol = Chem.MolFromSmiles("C1CC2=C3C(=CC=C2)C(=CN3C1)[C@H]4[C@@H](C(=O)NC4=O)C5=CNC6=CC=CC=C65")
+   # Default
+   mol # doctest: +ELLIPSIS
+
+.. testouput::
+
    <rdkit.Chem.rdchem.Mol object at 0x...>
    
 .. image:: images/RDKitCB_0_im0.png
