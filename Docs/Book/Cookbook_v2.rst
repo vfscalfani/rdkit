@@ -50,6 +50,7 @@ Include an Atom Index
 | **Index ID#:** RDKitCB_0
 | **Summary:** Draw a molecule with atom index numbers.
 
+.. codeblock:: python
 .. testcode::
 
    from rdkit import Chem
