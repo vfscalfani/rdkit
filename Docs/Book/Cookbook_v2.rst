@@ -38,11 +38,7 @@ is simply a way to track entries, new additions are sequentially numbered. Alter
 you can also send Cookbook revision and and addition requests to the mailing list:
 <rdkit-discuss@lists.sourceforge.net> (you will need to subscribe first).
 
-
-.. note::
-
-   Ignore the testcode and testoutput labels, these are for Sphinx document
-   testing and are unfortunately displayed in GitHub rendered .rst files.
+**Ignore the ..testcode:: and ..testoutput:: paragraph markup, these are for Sphinx document testing and are unfortunately displayed in GitHub rendered .rst files.**
 
 Drawing Molecules (in a Jupyter Environment)
 **********************************************
@@ -57,11 +53,11 @@ Include an Atom Index
 
 .. testcode::
 
-from rdkit import Chem
-from rdkit.Chem.Draw import IPythonConsole
-from rdkit.Chem import Draw
-IPythonConsole.ipython_useSVG=False
-import rdkit
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+   from rdkit.Chem import Draw
+   IPythonConsole.ipython_useSVG=False
+   import rdkit
 
 .. doctest::
   
