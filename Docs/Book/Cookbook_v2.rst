@@ -39,6 +39,11 @@ you can also send Cookbook revision and and addition requests to the mailing lis
 <rdkit-discuss@lists.sourceforge.net> (you will need to subscribe first).
 
 
+.. note::
+
+   Ignore the testcode and testoutput labels, these are for Sphinx document
+   testing and are unfortunately displayed in GitHub rendered .rst files.
+
 Drawing Molecules (in a Jupyter Environment)
 **********************************************
 
@@ -50,14 +55,13 @@ Include an Atom Index
 | **Index ID#:** RDKitCB_0
 | **Summary:** Draw a molecule with atom index numbers.
 
-.. codeblock:: python
 .. testcode::
 
-   from rdkit import Chem
-   from rdkit.Chem.Draw import IPythonConsole
-   from rdkit.Chem import Draw
-   IPythonConsole.ipython_useSVG=False
-   import rdkit
+from rdkit import Chem
+from rdkit.Chem.Draw import IPythonConsole
+from rdkit.Chem import Draw
+IPythonConsole.ipython_useSVG=False
+import rdkit
 
 .. doctest::
   
