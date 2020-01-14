@@ -3,6 +3,8 @@ RDKit Cookbook v2
 
 .. contents:: :local:
 
+.. sectionauthor:: Vincent F. Scalfani <vfscalfani@ua.edu>
+
 Introduction
 **************
 
@@ -12,9 +14,9 @@ What is this?
 This document provides examples of how to carry out particular tasks using the RDKit functionality
 from Python. The contents have been contributed by the RDKit community, tested with the latest 
 RDKit release, and then compiled into this document. Note that this document is the second 
-iteration of the Cookbook (i.e., v2). The old Cookbook written in Markdown is no longer 
+iteration of the :doc:`Cookbook` (i.e., v2). The old Cookbook written in Markdown is no longer 
 maintained, but is available in prior RDKit releases for reference. The RDKit Cookbook v2 
-is written in reStructuredText, which supports automatic Sphinx doctests, allowing for easier 
+is written in reStructuredText, which supports Sphinx doctests, allowing for easier 
 validation and maintenance of the RDKit Cookbook v2 code examples, where appropriate. 
 
 What gets included?
@@ -22,12 +24,13 @@ What gets included?
 
 The examples included come from various online sources such as blogs, shared gists, and 
 the RDKit mailing lists.  Generally, only minimal editing is added to the examples for 
-formatting consistency. We have made a conscious effort to appropriately credit the original 
-source and authors. For now, we are including anything that seems useful and reusable. 
-One of the first priorities of this document is to compile useful examples shared on the RDKit 
-mailing lists, as these can be difficult to discover. It will take some time, but we hope to expand 
-this document into 100s of examples. As the document grows, it may make sense to prioritize 
-examples included in the RDKit Cookbook v2 based on community demand.
+formatting consistency and to incorporate the doctests. We have made a conscious effort 
+to appropriately credit the original source and authors. For now, we are including anything 
+that seems useful and reusable. One of the first priorities of this document is to compile useful **short**
+examples shared on the RDKit mailing lists, as these can be difficult to discover. 
+It will take some time, but we hope to expand this document into 100s of examples. 
+As the document grows, it may make sense to prioritize examples included in the RDKit Cookbook 
+v2 based on community demand.
 
 Feedback
 =========
@@ -35,7 +38,7 @@ Feedback
 If you have suggestions for how to improve the Cookbook v2 and/or examples you would like 
 included, please contribute directly in the source document (the .rst file). The Index ID# 
 is simply a way to track entries, new additions are sequentially numbered. Alternatively, 
-you can also send Cookbook revision and and addition requests to the mailing list:
+you can also send Cookbook revisions and addition requests to the mailing list:
 <rdkit-discuss@lists.sourceforge.net> (you will need to subscribe first).
 
 Drawing Molecules (in a Jupyter Environment)
@@ -74,12 +77,11 @@ Include an Atom Index
    
 .. image:: images/RDKitCB_0_im0.png
 
-.. doctest::
+.. testcode::
   
-   >>> # With atom index
-   >>> mol_with_atom_index(mol) # doctest: +ELLIPSIS
-   <rdkit.Chem.rdchem.Mol object at 0x...>
-
+   # With atom index
+   mol_with_atom_index(mol)
+   
 .. image:: images/RDKitCB_0_im1.png
 
 Black and White Molecules
@@ -90,26 +92,24 @@ Black and White Molecules
 | **Index ID#:** RDKitCB_1
 | **Summary:** Draw a molecule in black and white.
 
-.. doctest::
+.. testcode::
 
-   >>> from rdkit import Chem
-   >>> from rdkit.Chem.Draw import IPythonConsole
-   >>> from rdkit.Chem import Draw
-   >>> import rdkit
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+   from rdkit.Chem import Draw
+   import rdkit
 
-.. doctest::
+.. testcode::
 
-   >>> ms = [Chem.MolFromSmiles(x) for x in ('Cc1onc(-c2ccccc2)c1C(=O)N[C@@H]1C(=O)N2[C@@H](C(=O)O)C(C)(C)S[C@H]12','CC1(C)SC2C(NC(=O)Cc3ccccc3)C(=O)N2C1C(=O)O.[Na]')]
-   >>> Draw.MolsToGridImage(ms) # doctest: +ELLIPSIS
-   <PIL.PngImagePlugin.PngImageFile image mode=RGB size=600x200 at 0x...>
-
+   ms = [Chem.MolFromSmiles(x) for x in ('Cc1onc(-c2ccccc2)c1C(=O)N[C@@H]1C(=O)N2[C@@H](C(=O)O)C(C)(C)S[C@H]12','CC1(C)SC2C(NC(=O)Cc3ccccc3)C(=O)N2C1C(=O)O.[Na]')]
+   Draw.MolsToGridImage(ms)
+   
 .. image:: images/RDKitCB_1_im0.png
 
-.. doctest::
+.. testcode::
 
-   >>> IPythonConsole.drawOptions.useBWAtomPalette()
-   >>> Draw.MolsToGridImage(ms) # doctest: +ELLIPSIS
-   <PIL.PngImagePlugin.PngImageFile image mode=RGB size=600x200 at 0x...>
+   IPythonConsole.drawOptions.useBWAtomPalette()
+   Draw.MolsToGridImage(ms)
 
 .. image:: images/RDKitCB_1_im1.png
 
@@ -121,19 +121,24 @@ Highlight a Substructure in a Molecule
 | **Index ID#:** RDKitCB_2
 | **Summary:** Draw a molecule with a substructure highlight.
 
-.. doctest::
+.. testcode::
 
-   >>> from rdkit import Chem
-   >>> from rdkit.Chem.Draw import IPythonConsole
-   >>> import rdkit
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+   import rdkit
 
-.. doctest::
+.. testcode::
 
-   >>> m = Chem.MolFromSmiles('c1cc(C(=O)O)c(OC(=O)C)cc1')
-   >>> print(m.GetSubstructMatches(Chem.MolFromSmarts('C(=O)O')))
+   m = Chem.MolFromSmiles('c1cc(C(=O)O)c(OC(=O)C)cc1')
+   print(m.GetSubstructMatches(Chem.MolFromSmarts('C(=O)O')))
+
+.. testoutput::
+   
    ((3, 4, 5), (8, 9, 7))
-   >>> m # doctest: +ELLIPSIS
-   <rdkit.Chem.rdchem.Mol object at 0x...>
+   
+.. testcode::
+   
+   m
 
 .. image:: images/RDKitCB_2_im0.png
    
@@ -149,46 +154,46 @@ Count Ring Systems
 | **Index ID#:** RDKitCB_3
 | **Summary:** Count ring systems in a molecule
 
-.. doctest::
+.. testcode::
 
-   >>> from rdkit import Chem
-   >>> from rdkit.Chem.Draw import IPythonConsole
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
 
-.. doctest::
+.. testcode::
 
-   >>> def GetRingSystems(mol,includeSpiro=False):
-   ...     ri = mol.GetRingInfo()
-   ...     systems = []
-   ...     for ring in ri.AtomRings():
-   ...         ringAts = set(ring)
-   ...         found = False
-   ...         nSystems = []
-   ...         for system in systems:
-   ...             nInCommon = len(ringAts.intersection(system)) 
-   ...             if nInCommon and (includeSpiro or nInCommon>1):
-   ...                 ringAts = ringAts.union(system)
-   ...             else:
-   ...                 nSystems.append(system)
-   ...         nSystems.append(ringAts)
-   ...         systems = nSystems
-   ...     return systems
+   def GetRingSystems(mol,includeSpiro=False):
+        ri = mol.GetRingInfo()
+        systems = []
+        for ring in ri.AtomRings():
+            ringAts = set(ring)
+            found = False
+            nSystems = []
+            for system in systems:
+                nInCommon = len(ringAts.intersection(system)) 
+                if nInCommon and (includeSpiro or nInCommon>1):
+                    ringAts = ringAts.union(system)
+                else:
+                    nSystems.append(system)
+            nSystems.append(ringAts)
+            systems = nSystems
+        return systems
 
-.. doctest::
+   mol = Chem.MolFromSmiles('CN1C(=O)CN=C(C2=C1C=CC(=C2)Cl)C3=CC=CC=C3')
+   print(GetRingSystems(mol))
 
-   >>> mol = Chem.MolFromSmiles('CN1C(=O)CN=C(C2=C1C=CC(=C2)Cl)C3=CC=CC=C3')
-   >>> GetRingSystems(mol)
+.. testoutput::
+
    [{1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {14, 15, 16, 17, 18, 19}]
 
-.. doctest::
+.. testcode::
 
-   >>> # Draw molecule with atom index (see RDKitCB_0)
-   >>> def mol_with_atom_index(mol):
-   ...     atoms = mol.GetNumAtoms()
-   ...     for idx in range(atoms):
-   ...         mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
-   ...     return mol
-   >>> mol_with_atom_index(mol) # doctest: +ELLIPSIS
-   <rdkit.Chem.rdchem.Mol object at 0x...>
+   # Draw molecule with atom index (see RDKitCB_0)
+   def mol_with_atom_index(mol):
+        atoms = mol.GetNumAtoms()
+        for idx in range(atoms):
+            mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber',str(mol.GetAtomWithIdx(idx).GetIdx()))
+        return mol
+   mol_with_atom_index(mol)
 
 .. image:: images/RDKitCB_3_im0.png
 
@@ -204,16 +209,25 @@ Kekule SMILES
 | **Index ID#:** RDKitCB_4
 | **Summary:** Kekulize a molecule and write Kekule SMILES
 
-.. doctest::
+.. testcode::
 
-   >>> from rdkit import Chem
-   >>> smi = "CN1C(NC2=NC=CC=C2)=CC=C1"
-   >>> mol = Chem.MolFromSmiles(smi)
-   >>> Chem.MolToSmiles(mol) 
-   'Cn1cccc1Nc1ccccn1'
-   >>> Chem.Kekulize(mol)
-   >>> Chem.MolToSmiles(mol, kekuleSmiles=True)
-   'CN1C=CC=C1NC1=NC=CC=C1'
+   from rdkit import Chem
+   smi = "CN1C(NC2=NC=CC=C2)=CC=C1"
+   mol = Chem.MolFromSmiles(smi)
+   print(Chem.MolToSmiles(mol))
+
+.. testoutput::
+ 
+   Cn1cccc1Nc1ccccn1
+
+.. testcode::
+
+   Chem.Kekulize(mol)
+   print(Chem.MolToSmiles(mol, kekuleSmiles=True))
+
+.. testoutput::
+
+   CN1C=CC=C1NC1=NC=CC=C1
 
 Isomeric SMILES without isotopes
 =================================
@@ -223,25 +237,26 @@ Isomeric SMILES without isotopes
 | **Index ID#:** RDKitCB_5
 | **Summary:** Write Isomeric SMILES without isotope information (i.e., only stereochemistry)
 
-.. doctest::
+.. testcode::
 
-   >>> from rdkit import Chem
-   >>> def MolWithoutIsotopesToSmiles(mol):
-   ...   atom_data = [(atom, atom.GetIsotope()) for atom in mol.GetAtoms()]
-   ...   for atom, isotope in atom_data:
-   ...       if isotope:
-   ...           atom.SetIsotope(0)
-   ...   smiles = Chem.MolToSmiles(mol)
-   ...   for atom, isotope in atom_data:
-   ...       if isotope:
-   ...          atom.SetIsotope(isotope)
-   ...   return smiles
+   from rdkit import Chem
+   def MolWithoutIsotopesToSmiles(mol):
+      atom_data = [(atom, atom.GetIsotope()) for atom in mol.GetAtoms()]
+      for atom, isotope in atom_data:
+          if isotope:
+              atom.SetIsotope(0)
+      smiles = Chem.MolToSmiles(mol)
+      for atom, isotope in atom_data:
+          if isotope:
+             atom.SetIsotope(isotope)
+      return smiles
+   
+   mol = Chem.MolFromSmiles("[19F][13C@H]([16OH])[35Cl]")
+   print(MolWithoutIsotopesToSmiles(mol))
 
-.. doctest::
+.. testoutput::
 
-   >>> mol = Chem.MolFromSmiles("[19F][13C@H]([16OH])[35Cl]")
-   >>> MolWithoutIsotopesToSmiles(mol)
-   'O[C@@H](F)Cl'
+   O[C@@H](F)Cl
 
 *N.B.* There are two limitations noted with this Isomeric SMILES without isotopes method 
 including with isotopic hydrogens, and a requirement to recalculate stereochemistry. 
@@ -257,65 +272,56 @@ Reversing Reactions
 | **Source:** `<https://gist.github.com/greglandrum/5ca4eebbe78f4d6d9b8cb03f401ad9cd>`_ and `<https://sourceforge.net/p/rdkit/mailman/message/36867857/>`_
 | **Index ID#:** RDKitCB_6
 | **Summary:** Decompose a reaction product into its reactants
-| **Note:** Example reaction from: Markus Hartenfeller, Martin Eberle, Peter Meier, Cristina Nieto-Oberhuber, Karl-Heinz Altmann, Gisbert Schneider, Edgar Jacoby, and Steffen Renner
-Journal of Chemical Information and Modeling 2011 51 (12), 3093-3098. DOI: 10.1021/ci200379p
+| **Reference Note:** Example reaction from Hartenfeller [#Hartenfeller2011]_ 
 
-.. doctest::
+.. testcode::
 
-   >>> from rdkit import Chem
-   >>> from rdkit.Chem import AllChem
-   >>> from rdkit.Chem import Draw
+   from rdkit import Chem
+   from rdkit.Chem import AllChem
+   from rdkit.Chem import Draw
 
-.. doctest::
+.. testcode::
 
-   >>> # Pictet-Spengler rxn
-   >>> rxn = AllChem.ReactionFromSmarts('[cH1:1]1:[c:2](-[CH2:7]-[CH2:8]-[NH2:9]):[c:3]:[c:4]:[c:5]:[c:6]:1.[#6:11]-[CH1;R0:10]=[OD1]>>[c:1]12:[c:2](-[CH2:7]-[CH2:8]-[NH1:9]-[C:10]-2(-[#6:11])):[c:3]:[c:4]:[c:5]:[c:6]:1')
-   >>> rxn # doctest: +ELLIPSIS
-   <rdkit.Chem.rdChemReactions.ChemicalReaction object at 0x...>
+   # Pictet-Spengler rxn
+   rxn = AllChem.ReactionFromSmarts('[cH1:1]1:[c:2](-[CH2:7]-[CH2:8]-[NH2:9]):[c:3]:[c:4]:[c:5]:[c:6]:1.[#6:11]-[CH1;R0:10]=[OD1]>>[c:1]12:[c:2](-[CH2:7]-[CH2:8]-[NH1:9]-[C:10]-2(-[#6:11])):[c:3]:[c:4]:[c:5]:[c:6]:1')
+   rxn
 
 .. image:: images/RDKitCB_6_im0.png
 
-.. doctest::
+.. testcode::
 
-   >>> rxn2 = AllChem.ChemicalReaction() 
-   >>> for i in range(rxn.GetNumReactantTemplates()):
-   ...     rxn2.AddProductTemplate(rxn.GetReactantTemplate(i))
-   1
-   2
+   rxn2 = AllChem.ChemicalReaction() 
+   for i in range(rxn.GetNumReactantTemplates()):
+       rxn2.AddProductTemplate(rxn.GetReactantTemplate(i))
+   for i in range(rxn.GetNumProductTemplates()): 
+       rxn2.AddReactantTemplate(rxn.GetProductTemplate(i))
+   rxn2.Initialize()
 
-.. doctest::
+.. testcode::
 
-   >>> for i in range(rxn.GetNumProductTemplates()): 
-   ...     rxn2.AddReactantTemplate(rxn.GetProductTemplate(i))
-   1
-   >>> rxn2.Initialize()
-
-.. doctest::
-
-   >>> reacts = [Chem.MolFromSmiles(x) for x in ('NCCc1ccccc1','C1CC1C(=O)')]
-   >>> ps = rxn.RunReactants(reacts)
-   >>> ps0 = ps[0]
-   >>> for p in ps0:
-   ...     Chem.SanitizeMol(p)
-   rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
-   >>> Draw.MolsToGridImage(ps0) # doctest: +ELLIPSIS
-   <PIL.PngImagePlugin.PngImageFile image mode=RGB size=600x200 at 0x...>
+   reacts = [Chem.MolFromSmiles(x) for x in ('NCCc1ccccc1','C1CC1C(=O)')]
+   ps = rxn.RunReactants(reacts)
+   ps0 = ps[0]
+   for p in ps0:
+       Chem.SanitizeMol(p)
+   Draw.MolsToGridImage(ps0)
 
 .. image:: images/RDKitCB_6_im1.png
 
-.. doctest::
+.. testcode::
 
-   >>> reacts = ps0
-   >>> rps = rxn2.RunReactants(reacts)
-   >>> rps0 = rps[0]
-   >>> for rp in rps0:
-   ...     Chem.SanitizeMol(rp)
-   rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
-   rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE
-   >>> Draw.MolsToGridImage(rps0) # doctest: +ELLIPSIS
-   <PIL.PngImagePlugin.PngImageFile image mode=RGB size=600x200 at 0x...>
+   reacts = ps0
+   rps = rxn2.RunReactants(reacts)
+   rps0 = rps[0]
+   for rp in rps0:
+       Chem.SanitizeMol(rp)
+   Draw.MolsToGridImage(rps0)
 
 .. image:: images/RDKitCB_6_im2.png
+
+.. rubric:: References
+
+.. [#Hartenfeller2011] Markus Hartenfeller, Martin Eberle, Peter Meier, Cristina Nieto-Oberhuber, Karl-Heinz Altmann, Gisbert Schneider, Edgar Jacoby, and Steffen Renner Journal of Chemical Information and Modeling 2011 51 (12), 3093-3098. DOI: 10.1021/ci200379p
 
 License
 ********
@@ -331,3 +337,4 @@ or send a letter to Creative Commons, 543 Howard Street, 5th Floor, San Francisc
 
 The intent of this license is similar to that of the RDKit itself. 
 In simple words: “Do whatever you want with it, but please give us some credit.”
+
