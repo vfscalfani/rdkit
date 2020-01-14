@@ -23,22 +23,21 @@ What gets included?
 =====================
 
 The examples included come from various online sources such as blogs, shared gists, and 
-the RDKit mailing lists.  Generally, only minimal editing is added to the examples for 
+the RDKit mailing lists. Generally, only minimal editing is added to the examples for 
 formatting consistency and to incorporate the doctests. We have made a conscious effort 
-to appropriately credit the original source and authors. For now, we are including anything 
-that seems useful and reusable. One of the first priorities of this document is to compile useful **short**
-examples shared on the RDKit mailing lists, as these can be difficult to discover. 
-It will take some time, but we hope to expand this document into 100s of examples. 
-As the document grows, it may make sense to prioritize examples included in the RDKit Cookbook 
-v2 based on community demand.
+to appropriately credit the original source and authors. One of the first priorities of this
+document is to compile useful **short** examples shared on the RDKit mailing lists, as 
+these can be difficult to discover. It will take some time, but we hope to expand this 
+document into 100s of examples. As the document grows, it may make sense to prioritize 
+examples included in the RDKit Cookbook v2 based on community demand.
 
 Feedback
 =========
 
 If you have suggestions for how to improve the Cookbook v2 and/or examples you would like 
 included, please contribute directly in the source document (the .rst file). The Index ID# 
-is simply a way to track entries, new additions are sequentially numbered. Alternatively, 
-you can also send Cookbook revisions and addition requests to the mailing list:
+is simply a way to track Cookbook entries and images. New additions are sequentially index numbered. 
+Alternatively, you can also send Cookbook revisions and addition requests to the mailing list:
 <rdkit-discuss@lists.sourceforge.net> (you will need to subscribe first).
 
 Drawing Molecules (in a Jupyter Environment)
@@ -197,6 +196,170 @@ Count Ring Systems
 
 .. image:: images/RDKitCB_3_im0.png
 
+Identify Aromatic Rings
+========================
+
+| **Author:** Benjamin Datko/ Greg Landrum
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36860045/>`_ and `<https://sourceforge.net/p/rdkit/mailman/message/23801106/>`_
+| **Index ID#:** RDKitCB_8
+| **Summary:** Identify which rings are aromatic in a molecule
+
+.. testcode::
+
+   from rdkit import Chem
+   m = Chem.MolFromSmiles('c1cccc2c1CCCC2')
+   m
+
+.. image:: images/RDKitCB_8_im0.png
+
+.. testcode::
+
+   ri = m.GetRingInfo()
+   # You can interrogate the RingInfo object to tell you the atoms that make up each ring:
+   print(ri.AtomRings())
+
+.. testoutput::
+
+   ((0, 5, 4, 3, 2, 1), (6, 7, 8, 9, 4, 5))
+
+.. testcode::
+
+   # or the bonds that make up each ring:
+   print(ri.BondRings())
+
+.. testoutput::
+
+   ((9, 4, 3, 2, 1, 0), (6, 7, 8, 10, 4, 5))
+
+.. testcode::
+
+   # To detect aromatic rings, I would loop over the bonds in each ring and
+   # flag the ring as aromatic if all bonds are aromatic:
+   def isRingAromatic(mol,bondRing):
+           for id in bondRing:
+               if not mol.GetBondWithIdx(id).GetIsAromatic():
+                   return False
+           return True
+
+.. testcode::
+
+   print(isRingAromatic(m,ri.BondRings()[0]))
+
+.. testoutput::
+
+   True
+
+.. testcode::
+
+   print(isRingAromatic(m,ri.BondRings()[1]))
+
+.. testoutput::
+
+   False
+
+Identify Aromatic Atoms (e.g., carbon)
+=======================================
+
+| **Author:** Paolo Tosco
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36862879/>`_
+| **Index ID#:** RDKitCB_9
+| **Summary:** Differentiate aromatic carbon from olefinic carbon with SMARTS
+
+.. testcode::
+
+   from rdkit import Chem
+   mol  =  Chem.MolFromSmiles("c1ccccc1C=CCC")
+   aromatic_carbon  =  Chem.MolFromSmarts("c")
+   print(mol.GetSubstructMatches(aromatic_carbon))
+
+.. testoutput::
+
+   ((0,), (1,), (2,), (3,), (4,), (5,))
+
+.. testcode::
+
+   olefinic_carbon  =  Chem.MolFromSmarts("[C^2]")
+   print(mol.GetSubstructMatches(olefinic_carbon))
+
+.. testoutput::
+
+   ((6,), (7,))
+
+Manipulating Molecules
+************************
+
+Create Fragments
+=================
+
+| **Author:** Paulo Tosco
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36895168/>`_ and `<https://gist.github.com/ptosco/3fb93b7c09dac15b6d355eb0ad29f532>`_
+| **Index ID#:** RDKitCB_7
+| **Summary:** Create fragments of molecules on bonds
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole, MolsToGridImage
+   # I have put explicit bonds in the SMILES definition to facilitate comprehension:
+   mol = Chem.MolFromSmiles("O-C-C-C-C-N")
+   mol1 = Chem.Mol(mol)
+   mol2 = Chem.Mol(mol)
+   mol1
+
+.. image:: images/RDKitCB_7_im0.png
+
+.. testcode::
+
+   # Chem.FragmentOnBonds() will fragment all specified bond indices at once, and return a single molecule
+   # with all specified cuts applied. By default, addDummies=True, so empty valences are filled with dummy atoms:
+   mol1_f = Chem.FragmentOnBonds(mol1, (0, 2, 4))
+   mol1_f
+
+.. image:: images/RDKitCB_7_im1.png
+
+.. testcode::
+
+   # This molecule can be split into individual fragments using Chem.GetMolFrags():
+   MolsToGridImage(Chem.GetMolFrags(mol1_f, asMols=True))
+
+.. image:: images/RDKitCB_7_im2.png
+
+.. testcode::
+
+   # Chem.FragmentOnSomeBonds() will fragment according to all permutations of numToBreak bonds at a time 
+   # (numToBreak defaults to 1), and return tuple of molecules with numToBreak cuts applied. By default, 
+   # addDummies=True, so empty valences are filled with dummy atoms:
+   mol2_f_tuple = Chem.FragmentOnSomeBonds(mol2, (0, 2, 4))
+
+.. testcode::
+
+   mol2_f_tuple[0]
+
+.. image:: images/RDKitCB_7_im3.png
+
+.. testcode::
+
+   mol2_f_tuple[1]
+
+.. image:: images/RDKitCB_7_im4.png
+
+.. testcode::
+
+   mol2_f_tuple[2]
+
+.. image:: images/RDKitCB_7_im5.png
+
+.. testcode::
+
+   # Finally, you can manually cut bonds using Chem.RWMol.RemoveBonds:
+   rwmol = Chem.RWMol(mol)
+   for b_idx in sorted([0, 2, 4], reverse=True):
+       b = rwmol.GetBondWithIdx(b_idx)
+       rwmol.RemoveBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
+   # And then call Chem.GetMolFrags() to get sanitized fragments where empty valences were filled with implicit hydrogens:
+   MolsToGridImage(Chem.GetMolFrags(rwmol, asMols=True))
+
+.. image:: images/RDKitCB_7_im6.png
 
 Writing Molecules
 *******************
