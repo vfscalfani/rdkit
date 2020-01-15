@@ -1,8 +1,6 @@
 RDKit Cookbook v2
 %%%%%%%%%%%%%%%%%%%%
 
-.. contents:: :local:
-
 .. sectionauthor:: Vincent F. Scalfani <vfscalfani@ua.edu>
 
 Introduction
@@ -143,7 +141,7 @@ Highlight a Substructure in a Molecule
    
 
 Rings, Aromaticity, and Kekulization
-************************************
+*************************************
 
 Count Ring Systems
 =====================
@@ -361,6 +359,76 @@ Create Fragments
 
 .. image:: images/RDKitCB_7_im6.png
 
+
+Substructure Matching
+***********************
+
+Functional Group with SMARTS queries
+=====================================
+
+| **Author:** Paulo Tosco
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36810326/>`_
+| **Index ID#:** RDKitCB_10
+| **Summary:** Match a functional group (e.g., alcohol) with a SMARTS query 
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+   sucrose = "C([C@@H]1[C@H]([C@@H]([C@H]([C@H](O1)O[C@]2([C@H]([C@@H]([C@H](O2)CO)O)O)CO)O)O)O)O"
+   sucrose_mol  =  Chem.MolFromSmiles(sucrose)
+   primary_alcohol  =  Chem.MolFromSmarts("[CH2][OH1]")
+   print(sucrose_mol.GetSubstructMatches(primary_alcohol))
+
+.. testoutput::
+
+   ((0, 22), (13, 14), (17, 18))
+
+.. testcode::
+
+   secondary_alcohol  =  Chem.MolFromSmarts("[CH1][OH1]")
+   print(sucrose_mol.GetSubstructMatches(secondary_alcohol))
+
+.. testoutput::
+
+   ((2, 21), (3, 20), (4, 19), (9, 16), (10, 15))
+
+
+Macrocycles with SMARTS queries
+=====================================
+
+| **Author:** Ivan Tubert-Brohman / David Cosgrove (Vincent Scalfani added example)
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36781480/>`_
+| **Index ID#:** RDKitCB_13
+| **Summary:** Match a macrocycle ring with a SMARTS query 
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+   from rdkit.Chem import Draw
+   erythromycin = Chem.MolFromSmiles("CC[C@@H]1[C@@]([C@@H]([C@H](C(=O)[C@@H](C[C@@]([C@@H]([C@H]([C@@H]([C@H](C(=O)O1)C)O[C@H]2C[C@@]([C@H]([C@@H](O2)C)O)(C)OC)C)O[C@H]3[C@@H]([C@H](C[C@H](O3)C)N(C)C)O)(C)O)C)C)O)(C)O")
+   erythromycin
+
+.. image:: images/RDKitCB_13_im0.png
+
+.. testcode::
+
+   # Define SMARTS pattern with ring size > 12
+   macro  =  Chem.MolFromSmarts("[r{12-}]")
+   print(erythromycin.GetSubstructMatches(macro))
+
+.. testoutput::
+
+   ((2,), (3,), (4,), (5,), (6,), (8,), (9,), (10,), (11,), (12,), (13,), (14,), (15,), (17,))
+
+.. testcode::
+
+   erythromycin
+
+.. image:: images/RDKitCB_13_im1.png
+
+
 Writing Molecules
 *******************
 
@@ -481,6 +549,202 @@ Reversing Reactions
    Draw.MolsToGridImage(rps0)
 
 .. image:: images/RDKitCB_6_im2.png
+
+
+Error Messages
+****************
+
+Explicit Valence Error - Partial Sanitization
+==============================================
+
+| **Author:** Greg Landrum
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/32599798/>`_
+| **Index ID#:** RDKitCB_15
+| **Summary:** Create a mol object with skipping valence check, followed by a partial sanitization. N.B. Use caution, and make sure your molecules actually make sense before doing this!
+
+.. testcode::
+
+   from rdkit import Chem
+   # default RDKit behavior is to reject hypervalent P, so you need to set sanitize=False
+   m = Chem.MolFromSmiles('F[P-](F)(F)(F)(F)F.CN(C)C(F)=[N+](C)C',sanitize=False)
+
+.. testcode::
+
+   # next, you probably want to at least do a partial sanitization so that the molecule is actually useful:
+   m.UpdatePropertyCache(strict=False)
+   Chem.SanitizeMol(m,Chem.SanitizeFlags.SANITIZE_FINDRADICALS|Chem.SanitizeFlags.SANITIZE_KEKULIZE|Chem.SanitizeFlags.SANITIZE_SETAROMATICITY|Chem.SanitizeFlags.SANITIZE_SETCONJUGATION|Chem.SanitizeFlags.SANITIZE_SETHYBRIDIZATION|Chem.SanitizeFlags.SANITIZE_SYMMRINGS,catchErrors=True)
+
+
+Capturing Error Messages with Chem.DetectChemistryProblems
+==========================================================
+
+| **Author:** Greg Landrum
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36779572/>`_
+| **Index ID#:** RDKitCB_14
+| **Summary:** Identify and capture error messages when creating mol objects.
+
+.. testcode::
+
+   from rdkit import Chem
+   m = Chem.MolFromSmiles('CN(C)(C)C',sanitize=False)
+   problems = Chem.DetectChemistryProblems(m)
+   print(len(problems))
+
+.. testoutput::
+
+   1
+
+.. testcode::
+
+   print(problems[0].GetType())
+   print(problems[0].GetAtomIdx())
+   print(problems[0].Message())
+
+.. testoutput::
+
+   AtomValenceException
+   1
+   Explicit valence for atom # 1 N, 4, is greater than permitted
+
+.. testcode:: 
+
+   m2 = Chem.MolFromSmiles('c1cncc1',sanitize=False)
+   problems = Chem.DetectChemistryProblems(m2)
+   print(len(problems))
+
+.. testoutput::
+
+   1
+
+.. testcode::
+
+   print(problems[0].GetType())
+   print(problems[0].GetAtomIndices())
+   print(problems[0].Message())
+   
+.. testoutput::
+   :options: -ELLIPSIS, +NORMALIZE_WHITESPACE
+
+   KekulizeException
+   (0, 1, 2, 3, 4)
+   Can't kekulize mol.  Unkekulized atoms: 0 1 2 3 4
+
+Miscellaneous Topics
+**********************
+
+Explicit Valence and Number of Hydrogens
+==============================================
+
+| **Author:** Michael Palmer/ Greg Landrum
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/29679834/>`_
+| **Index ID#:** RDKitCB_11
+| **Summary:** Calculate the explicit valence, number of explicit and implicit hydrogens, and total number of hydrogens on an atom. See the link for an important explanation about terminology and implementation of these methods in RDKit. Highlights are presented below.
+
+Most of the time (exception is explained below), explicit refers to atoms that are in the graph and 
+implicit refers to atoms that are not in the graph (i.e., Hydrogens). So given that the ring is aromatic (e.g.,in pyrrole), 
+the explicit valence of each of the atoms (ignores the Hs that are not present in the graph) in pyrrole is 3. If you want the Hydrogen count,
+use GetTotalNumHs(); the total number of Hs for each atom is one:
+
+.. testcode::
+
+    from rdkit import Chem
+    pyrrole = Chem.MolFromSmiles('C1=CNC=C1')
+    for atom in pyrrole.GetAtoms():
+       print(atom.GetSymbol(), atom.GetExplicitValence(), atom.GetTotalNumHs())
+
+.. testoutput::
+
+   C 3 1
+   C 3 1
+   N 3 1
+   C 3 1
+   C 3 1
+
+In RDKit, there is overlapping nomenclature around the use of the words
+"explicit" and "implicit" when it comes to Hydrogens. When you specify the Hydrogens for an atom inside of square brackets 
+in the SMILES, it becomes an "explicit" hydrogen as far as atom.GetNumExplicitHs() is concerned. Here is an example:
+
+.. testcode::
+
+   pyrrole = Chem.MolFromSmiles('C1=CNC=C1')
+   mol1 = Chem.MolFromSmiles('C1=CNCC1')
+   mol2 = Chem.MolFromSmiles('C1=C[NH]CC1')
+
+.. testcode::
+
+   for atom in pyrrole.GetAtoms():
+       print(atom.GetSymbol(), atom.GetExplicitValence(), atom.GetNumImplicitHs(), atom.GetNumExplicitHs(), atom.GetTotalNumHs())
+
+.. testoutput::
+
+   C 3 1 0 1
+   C 3 1 0 1
+   N 3 0 1 1
+   C 3 1 0 1
+   C 3 1 0 1
+
+.. testcode::
+   
+    for atom in mol1.GetAtoms():
+       print(atom.GetSymbol(), atom.GetExplicitValence(), atom.GetNumImplicitHs(), atom.GetNumExplicitHs(), atom.GetTotalNumHs())
+
+.. testoutput::
+
+   C 3 1 0 1
+   C 3 1 0 1
+   N 2 1 0 1
+   C 2 2 0 2
+   C 2 2 0 2
+
+.. testcode::
+    
+    for atom in mol2.GetAtoms():
+       print(atom.GetSymbol(), atom.GetExplicitValence(), atom.GetNumImplicitHs(), atom.GetNumExplicitHs(), atom.GetTotalNumHs())
+
+.. testoutput::
+
+   C 3 1 0 1
+   C 3 1 0 1
+   N 3 0 1 1
+   C 2 2 0 2
+   C 2 2 0 2
+
+Wiener Index
+=============
+
+| **Author:** Greg Landrum
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36802142/>`_
+| **Index ID#:** RDKitCB_12
+| **Summary:** Calculate the Wiener index (a topological index of a molecule)
+
+.. testcode::
+
+   from rdkit import Chem
+   def wiener_index(m):
+       res = 0
+       amat = Chem.GetDistanceMatrix(m)
+       for i in range(m.GetNumAtoms()):
+           for j in range(i+1,m.GetNumAtoms()):
+               res += amat[i][j]
+       return res
+
+.. testcode::
+
+   butane = Chem.MolFromSmiles('CCCC')
+   print(wiener_index(butane))
+
+.. testoutput::
+
+   10.0
+
+.. testcode::
+
+   isobutane = Chem.MolFromSmiles('CC(C)C')
+   print(wiener_index(isobutane))
+
+.. testoutput::
+
+   9.0
 
 .. rubric:: References
 
