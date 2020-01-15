@@ -140,6 +140,32 @@ Highlight a Substructure in a Molecule
 .. image:: images/RDKitCB_2_im0.png
    
 
+Without Implicit Hydrogens
+===========================
+
+| **Author:** Greg Landrum
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36746387/>`_ and `<https://gist.github.com/greglandrum/9283aeadfb66d0fe8a2900e63fb10f3e>`_
+| **Index ID#:** RDKitCB_17
+| **Summary:** Draw a molecule without implicit hydrogens
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+   m = Chem.MolFromSmiles('[Pt](Cl)(Cl)(N)N')
+   m
+
+.. image:: images/RDKitCB_17_im0.png
+
+.. testcode::
+
+   for atom in m.GetAtoms():
+       atom.SetProp("atomLabel",atom.GetSymbol())
+   m
+
+.. image:: images/RDKitCB_17_im1.png
+
+
 Rings, Aromaticity, and Kekulization
 *************************************
 
@@ -282,6 +308,86 @@ Identify Aromatic Atoms (e.g., carbon)
 .. testoutput::
 
    ((6,), (7,))
+
+Stereochemistry
+****************
+
+Identifying Chiral Centers
+===========================
+
+| **Author:** Jan Holst Jensen
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36762171/>`_
+| **Index ID#:** RDKitCB_16
+| **Summary:** Identify chiral centers from molfile with coordinates and isomeric SMILES.
+
+.. testcode::
+
+   from rdkit import Chem
+   # Create a mol object from L-alanine molfile with coordinates
+   mol1 = Chem.MolFromMolBlock("""
+        RDKit          2D
+
+     6  5  0  0  0  0  0  0  0  0999 V2000
+       0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+       1.2990    0.7500    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+       1.2990    2.2500    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+       2.5981   -0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+       2.5981   -1.5000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+       3.8971    0.7500    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+     2  1  1  6
+     2  3  1  0
+     2  4  1  0
+     4  5  2  0
+     4  6  1  0
+   M  END""")
+
+.. testcode::
+   
+   Chem.AssignAtomChiralTagsFromStructure(mol1)
+   print(Chem.FindMolChiralCenters(mol1))
+
+.. testoutput::
+
+   [(1, 'S')]
+
+.. testcode::
+   
+   # This also works with isomeric SMILES
+   print(Chem.MolToSmiles(mol1, isomericSmiles = True))
+
+.. testoutput::
+
+   C[C@H](N)C(=O)O
+
+.. testcode::
+
+   mol2 = Chem.MolFromSmiles("C[C@H](N)C(=O)O")
+   Chem.AssignAtomChiralTagsFromStructure(mol2)
+   print(Chem.FindMolChiralCenters(mol2))
+
+.. testoutput::
+
+   [(1, 'S')]
+
+.. testcode::
+
+   # When you output as non-isomeric SMILES and read it back in, the chiral information is lost because the 
+   # molecule no longer has a conformation:
+   print(Chem.MolToSmiles(mol1, isomericSmiles = False))
+
+.. testoutput::
+
+   CC(N)C(=O)O
+
+.. testcode::
+
+   mol3 = Chem.MolFromSmiles("CC(N)C(=O)O")
+   Chem.AssignAtomChiralTagsFromStructure(mol3)
+   print(Chem.FindMolChiralCenters(mol3))
+
+.. testoutput::
+
+   []
 
 Manipulating Molecules
 ************************
@@ -428,6 +534,86 @@ Macrocycles with SMARTS queries
 
 .. image:: images/RDKitCB_13_im1.png
 
+
+Returning Substructure Matches as SMILES
+=========================================
+
+| **Author:** Andrew Dalke
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36735316/>`_
+| **Index ID#:** RDKitCB_18
+| **Summary:** Obtain SMILES of the matched substructure.
+
+.. testcode::
+
+   from rdkit import Chem
+   pat = Chem.MolFromSmarts("[NX1]#[CX2]") #matches nitrile
+   mol = Chem.MolFromSmiles("CCCC#N") # Butyronitrile
+   atom_indices = mol.GetSubstructMatch(pat)
+   print(atom_indices)
+
+.. testoutput::
+
+   (4, 3)
+
+.. testcode::
+
+   print(Chem.MolFragmentToSmiles(mol, atom_indices)) # returns the nitrile
+
+.. testoutput::
+
+   C#N
+
+.. testcode::
+
+   # Note however that if only the atom indices are given then Chem.MolFragmentToSmiles() will include all bonds 
+   # which connect those atoms, even if the original SMARTS does not match those bonds. For example:
+   pat = Chem.MolFromSmarts("*~*~*~*") # match 4 linear atoms
+   mol = Chem.MolFromSmiles("C1CCC1") # ring of size 4
+   atom_indices = mol.GetSubstructMatch(pat)
+   print(atom_indices)
+
+.. testoutput::
+
+   (0, 1, 2, 3)
+
+.. testcode::
+
+   print(Chem.MolFragmentToSmiles(mol, atom_indices))  # returns the ring
+
+.. testoutput::
+
+   C1CCC1
+
+.. testcode::
+
+   # If this is important, then you need to pass the correct bond indices to MolFragmentToSmiles(). 
+   # This can be done by using the bonds in the query graph to get the bond indices in the molecule graph. 
+   # I believe the following is correct:
+   def get_match_bond_indices(query, mol, match_atom_indices):
+       bond_indices = []
+       for query_bond in query.GetBonds():
+           atom_index1 = match_atom_indices[query_bond.GetBeginAtomIdx()]
+           atom_index2 = match_atom_indices[query_bond.GetEndAtomIdx()]
+           bond_indices.append(mol.GetBondBetweenAtoms(
+                atom_index1, atom_index2).GetIdx())
+       return bond_indices
+
+.. testcode::
+
+   bond_indices = get_match_bond_indices(pat, mol, atom_indices)
+   print(bond_indices)
+
+.. testoutput::
+
+   [0, 1, 2]
+
+.. testcode::
+
+   print(Chem.MolFragmentToSmiles(mol, atom_indices, bond_indices))
+
+.. testoutput::
+
+   CCCC
 
 Writing Molecules
 *******************
@@ -745,6 +931,62 @@ Wiener Index
 .. testoutput::
 
    9.0
+
+
+Organometallics with Dative Bonds
+==================================
+
+| **Author:** Greg Landrum
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36727044/>`_ and `<https://gist.github.com/greglandrum/6cd7aadcdedb1ebcafa9537e8a47e3a4>_
+| **Index ID#:** RDKitCB_19
+| **Summary:** Process organometallic SMILES by detecting single bonds between metals and replacing with dative bonds.
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem.Draw import IPythonConsole
+
+.. testcode::
+
+    def is_transition_metal(at):
+        n = at.GetAtomicNum()
+        return (n>=22 and n<=29) or (n>=40 and n<=47) or (n>=72 and n<=79)
+    def set_dative_bonds(mol,fromAtoms=(7,8)):
+        """ convert some bonds to dative 
+    
+        Replaces some single bonds between metals and atoms with atomic numbers in fomAtoms
+        with dative bonds. The replacement is only done if the atom has "too many" bonds.
+    
+        Returns the modified molecule.   
+    
+        """
+        pt = Chem.GetPeriodicTable()
+        rwmol = Chem.RWMol(mol)
+        rwmol.UpdatePropertyCache(strict=False)
+        metals = [at for at in rwmol.GetAtoms() if is_transition_metal(at)]
+        for metal in metals:
+            for nbr in metal.GetNeighbors():
+                if nbr.GetAtomicNum() in fromAtoms and \
+                   nbr.GetExplicitValence()>pt.GetDefaultValence(nbr.GetAtomicNum()) and \
+                   rwmol.GetBondBetweenAtoms(nbr.GetIdx(),metal.GetIdx()).GetBondType() == Chem.BondType.SINGLE:
+                    rwmol.RemoveBond(nbr.GetIdx(),metal.GetIdx())
+                    rwmol.AddBond(nbr.GetIdx(),metal.GetIdx(),Chem.BondType.DATIVE)
+        return rwmol
+
+.. testcode::
+
+   m = Chem.MolFromSmiles('CN(C)(C)[Pt]',sanitize=False)
+   m2 = set_dative_bonds(m)
+
+.. testcode::
+
+   # Note that the dative bond is not currently displayed in the molecule drawing,
+   # but we can check the bond between nitrogen and platinum
+   print(m2.GetBondBetweenAtoms(1,4).GetBondType())
+
+.. testoutput::
+
+   DATIVE
 
 .. rubric:: References
 
