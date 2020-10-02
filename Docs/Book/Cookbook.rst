@@ -39,7 +39,7 @@ Alternatively, you can also send Cookbook revisions and addition requests to the
 
    The Index ID# (e.g., **RDKitCB_##**) is simply a way to track Cookbook entries and image file names. 
    New Cookbook additions are sequentially index numbered, regardless of where they are placed 
-   within the document. As such, for reference, the next Cookbook entry is **RDKitCB_30**.
+   within the document. As such, for reference, the next Cookbook entry is **RDKitCB_32**.
 
 Drawing Molecules (Jupyter)
 *******************************
@@ -594,6 +594,50 @@ Create Fragments
 .. image:: images/RDKitCB_7_im6.png
    :scale: 75%
 
+
+Largest Fragment
+=================
+
+| **Author:** Andrew Dalke and Susan Leung
+| **Source:** `<https://sourceforge.net/p/rdkit/mailman/message/36355644/>`_ and `<https://github.com/susanhleung/rdkit/blob/dev/GSOC2018_MolVS_Integration/rdkit/Chem/MolStandardize/tutorial/MolStandardize.ipynb>`_
+| **Index ID#:** RDKitCB_31
+| **Summary:** Select largest fragment from a molecule
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem import rdmolops
+   mol = Chem.MolFromSmiles('CCOC(=O)C(C)(C)OC1=CC=C(C=C1)Cl.CO.C1=CC(=CC=C1C(=O)N[C@@H](CCC(=O)O)C(=O)O)NCC2=CN=C3C(=N2)C(=O)NC(=N3)N')
+
+.. testcode::
+
+   mol_frags = rdmolops.GetMolFrags(mol, asMols = True)
+   largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
+   print(Chem.MolToSmiles(largest_mol))
+
+.. testoutput::
+
+   Nc1nc2ncc(CNc3ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)cc3)nc2c(=O)[nH]1
+
+
+The same result can also be achieved with MolStandardize:
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem.MolStandardize import rdMolStandardize
+   mol = Chem.MolFromSmiles('CCOC(=O)C(C)(C)OC1=CC=C(C=C1)Cl.CO.C1=CC(=CC=C1C(=O)N[C@@H](CCC(=O)O)C(=O)O)NCC2=CN=C3C(=N2)C(=O)NC(=N3)N')
+
+.. testcode::
+
+   # setup standardization module
+   largest_Fragment = rdMolStandardize.LargestFragmentChooser()
+   largest_mol = largest_Fragment.choose(mol)
+   print(Chem.MolToSmiles(largest_mol))
+
+.. testoutput::
+
+   Nc1nc2ncc(CNc3ccc(C(=O)N[C@@H](CCC(=O)O)C(=O)O)cc3)nc2c(=O)[nH]1
 
 Sidechain-Core Enumeration 
 ===========================
