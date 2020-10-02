@@ -476,6 +476,43 @@ Identifying Chiral Centers
 
    []
 
+
+Identifying E/Z Stereo
+===========================
+
+| **Author:** Vincent Scalfani
+| **Source:** Direct Contribution to Cookbook
+| **Index ID#:** RDKitCB_30
+| **Summary:** Identify double bond E/Z stereochemistry.
+
+.. testcode::
+
+   from rdkit import Chem
+   m = Chem.MolFromSmiles('C\C(F)=C\C=C(/F)\C(=C\F)\C=C')
+   m # see RDKitCB_0 for atom index display
+
+.. image:: images/RDKitCB_30_im0.png
+
+.. testcode::
+
+   for b in m.GetBonds():
+       print(b.GetBeginAtomIdx(),b.GetEndAtomIdx(),
+             b.GetBondType(),b.GetStereo())
+
+.. testoutput::
+
+   0 1 SINGLE STEREONONE
+   1 2 SINGLE STEREONONE
+   1 3 DOUBLE STEREOZ
+   3 4 SINGLE STEREONONE
+   4 5 DOUBLE STEREOZ
+   5 6 SINGLE STEREONONE
+   5 7 SINGLE STEREONONE
+   7 8 DOUBLE STEREOE
+   8 9 SINGLE STEREONONE
+   7 10 SINGLE STEREONONE
+   10 11 DOUBLE STEREONONE
+
 Manipulating Molecules
 ************************
 
