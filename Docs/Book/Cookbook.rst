@@ -39,7 +39,7 @@ Alternatively, you can also send Cookbook revisions and addition requests to the
 
    The Index ID# (e.g., **RDKitCB_##**) is simply a way to track Cookbook entries and image file names. 
    New Cookbook additions are sequentially index numbered, regardless of where they are placed 
-   within the document. As such, for reference, the next Cookbook entry is **RDKitCB_32**.
+   within the document. As such, for reference, the next Cookbook entry is **RDKitCB_33**.
 
 Drawing Molecules (Jupyter)
 *******************************
@@ -114,6 +114,51 @@ Include a Calculation
 
 .. image:: images/RDKitCB_23_im1.png
    :scale: 75%
+
+Include Stereo Annotations
+===========================
+
+| **Author:** Valery Polyakov and Greg Landrum
+| **Source:** `<https://github.com/rdkit/rdkit/issues/3103>`_ and `<https://gist.github.com/greglandrum/33d8bd8149ec35999b2c70af9e4a0811>`_
+| **Index ID#:** RDKitCB_32
+| **Summary:** Draw a molecule with stereochemistry annotations displayed.
+
+.. testcode::
+
+   from rdkit import Chem
+   from rdkit.Chem import rdDepictor
+   from rdkit.Chem.Draw import rdMolDraw2D
+   from IPython.display import SVG
+
+.. testcode::
+
+   def mol_with_stereo(mol,molSize=(300,300), kekulize=True, fontSize = 0.8, LineWidth = 1):
+       # check for defective molecule 
+       if mol is None:
+           return None
+
+       mol = rdMolDraw2D.PrepareMolForDrawing(mol, kekulize)
+       drawer = rdMolDraw2D.MolDraw2DSVG(molSize[0], molSize[1])
+       drawer.SetFontSize(fontSize)
+       drawer.drawOptions().addStereoAnnotation = True
+       # drawer.drawOptions().addAtomIndices = True
+
+       try:
+           drawer.SetLineWidth(LineWidth)
+       except:
+           pass
+
+       drawer.DrawMolecule(mol)
+       drawer.FinishDrawing()
+       svg = drawer.GetDrawingText()
+       return svg
+
+.. testcode::
+
+   m = Chem.MolFromSmiles('C[C@H](F)C\C=C/O')
+   SVG(mol_with_stereo(m))
+
+.. image:: images/RDKitCB_32_im0.png
 
 Black and White Molecules
 ==========================
