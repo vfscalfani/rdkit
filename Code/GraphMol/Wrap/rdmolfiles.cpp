@@ -580,6 +580,10 @@ void wrap_sdwriter();
 void wrap_tdtwriter();
 void wrap_pdbwriter();
 
+// MultithreadedMolSupplier stuff
+void wrap_multiSmiSupplier();
+void wrap_multiSDSupplier();
+
 BOOST_PYTHON_MODULE(rdmolfiles) {
   std::string docString;
 
@@ -1027,7 +1031,7 @@ BOOST_PYTHON_MODULE(rdmolfiles) {
  \n\
      CC{Q}C with {'{Q}':'OCCO'} -> CCOCCOC  \n\n\
      C{A}C{Q}C with {'{Q}':'OCCO', '{A}':'C1(CC1)'} -> CC1(CC1)COCCOC  \n\n\
-     C{A}C{Q}C with {'{Q}':'{X}CC{X}', '{A}':'C1CC1', '{X}':'N'} -> CC1CC1CCNCCNC  \n\n\
+     C{A}C{Q}C with {'{Q}':'{X}CC{X}', '{A}':'C1CC1', '{X}':'N'} -> CC1CC1CNCCNC  \n\n\
 \n";
   python::def("MolFromSmiles", RDKit::MolFromSmiles,
               (python::arg("SMILES"), python::arg("sanitize") = true,
@@ -1776,4 +1780,12 @@ BOOST_PYTHON_MODULE(rdmolfiles) {
   wrap_sdwriter();
   wrap_tdtwriter();
   wrap_pdbwriter();
+
+#ifdef RDK_THREADSAFE_SSS
+  /********************************************************
+   * MultithreadedMolWriter stuff
+   *******************************************************/
+  wrap_multiSmiSupplier();
+  wrap_multiSDSupplier();
+#endif
 }

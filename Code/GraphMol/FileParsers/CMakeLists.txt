@@ -12,6 +12,7 @@ if(WIN32)
     set(zlib_lib Boost::zlib)
   else()
     find_package(ZLIB)
+    include_directories(${ZLIB_INCLUDE_DIRS})
     set(zlib_lib ${ZLIB_LIBRARIES})
   endif()
 
@@ -23,6 +24,7 @@ else()
      add_definitions("-DBOOST_IOSTREAMS_DYN_LINK")
   endif()
   find_package(ZLIB)
+  include_directories(${ZLIB_INCLUDE_DIRS})
   set(zlib_lib ${ZLIB_LIBRARIES})
 endif()
 ADD_DEFINITIONS("-DRDK_USE_BOOST_IOSTREAMS")
@@ -53,6 +55,9 @@ rdkit_library(FileParsers
               ProximityBonds.cpp
               SequenceParsers.cpp SequenceWriters.cpp
               SVGParser.cpp PNGParser.cpp
+							MultithreadedMolSupplier.cpp
+							MultithreadedSmilesMolSupplier.cpp
+							MultithreadedSDMolSupplier.cpp
               LINK_LIBRARIES Depictor SmilesParse GraphMol ${RDK_MAEPARSER_LIBS} ${regex_lib} ${link_iostreams})
 target_compile_definitions(FileParsers PRIVATE RDKIT_FILEPARSERS_BUILD)
 
@@ -62,6 +67,10 @@ rdkit_headers(FileParsers.h
               MolSupplier.h
               MolWriters.h
               SequenceParsers.h SequenceWriters.h
+              GeneralFileReader.h
+							MultithreadedMolSupplier.h
+							MultithreadedSmilesMolSupplier.h
+							MultithreadedSDMolSupplier.h
               PNGParser.h
               DEST GraphMol/FileParsers)
 
@@ -72,6 +81,14 @@ rdkit_test(fileParsersTest1 test1.cpp
 
 rdkit_test(testMolSupplier testMolSupplier.cpp
            LINK_LIBRARIES  FileParsers RDStreams)
+
+rdkit_test(testGeneralFileReader testGeneralFileReader.cpp
+					LINK_LIBRARIES FileParsers RDStreams)
+
+if(RDK_TEST_MULTITHREADED)
+rdkit_test(testMultithreadedMolSupplier testMultithreadedMolSupplier.cpp
+					LINK_LIBRARIES FileParsers Fingerprints RDStreams)
+endif(RDK_TEST_MULTITHREADED)
 
 rdkit_test(testMolWriter testMolWriter.cpp LINK_LIBRARIES FileParsers )
 
