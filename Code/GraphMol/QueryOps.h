@@ -249,6 +249,14 @@ static inline int queryBondIsSingleOrAromatic(Bond const *bond) {
   return static_cast<int>(bond->getBondType() == Bond::SINGLE ||
                           bond->getBondType() == Bond::AROMATIC);
 };
+static inline int queryBondIsDoubleOrAromatic(Bond const *bond) {
+  return static_cast<int>(bond->getBondType() == Bond::DOUBLE ||
+                          bond->getBondType() == Bond::AROMATIC);
+};
+static inline int queryBondIsSingleOrDouble(Bond const *bond) {
+  return static_cast<int>(bond->getBondType() == Bond::SINGLE ||
+                          bond->getBondType() == Bond::DOUBLE);
+};
 static inline int queryBondIsSingleOrDoubleOrAromatic(Bond const *bond) {
   return static_cast<int>(bond->getBondType() == Bond::SINGLE ||
                           bond->getBondType() == Bond::DOUBLE ||
@@ -642,6 +650,10 @@ RDKIT_GRAPHMOL_EXPORT BOND_EQUALS_QUERY *makeBondOrderEqualsQuery(
     Bond::BondType what);
 //! returns a Query for unspecified SMARTS bonds
 RDKIT_GRAPHMOL_EXPORT BOND_EQUALS_QUERY *makeSingleOrAromaticBondQuery();
+//! returns a Query for double|aromatic bonds
+RDKIT_GRAPHMOL_EXPORT BOND_EQUALS_QUERY *makeDoubleOrAromaticBondQuery();
+//! returns a Query for single|double bonds
+RDKIT_GRAPHMOL_EXPORT BOND_EQUALS_QUERY *makeSingleOrDoubleBondQuery();
 //! returns a Query for tautomeric bonds
 RDKIT_GRAPHMOL_EXPORT BOND_EQUALS_QUERY *
 makeSingleOrDoubleOrAromaticBondQuery();
@@ -1049,6 +1061,9 @@ Queries::EqualityQuery<int, const Target *, true> *makePropQuery(
 RDKIT_GRAPHMOL_EXPORT bool isComplexQuery(const Bond *b);
 RDKIT_GRAPHMOL_EXPORT bool isComplexQuery(const Atom *a);
 RDKIT_GRAPHMOL_EXPORT bool isAtomAromatic(const Atom *a);
+RDKIT_GRAPHMOL_EXPORT bool isAtomListQuery(const Atom *a);
+RDKIT_GRAPHMOL_EXPORT void getAtomListQueryVals(const Atom::QUERYATOM_QUERY *q,
+                                                std::vector<int> &vals);
 
 namespace QueryOps {
 RDKIT_GRAPHMOL_EXPORT void completeMolQueries(

@@ -73,6 +73,7 @@ struct DrawColour {
 enum class MolDrawShapeType {
   Arrow,  // ordering of points is: start, end, p1, p2
   Polyline,
+  Ellipse,
 };
 
 //! extra shape to add to canvas
@@ -82,6 +83,7 @@ struct MolDrawShape {
   DrawColour lineColour{0, 0, 0};
   int lineWidth = 2;
   bool fill = false;
+  bool scaleLineWidth = false;
 };
 
 // for holding dimensions of the rectangle round a string.
@@ -169,10 +171,11 @@ struct AnnotationType {
   StringRect rect_;
   OrientType orient_ = OrientType::C;
   TextAlignType align_ = TextAlignType::MIDDLE;
+  bool scaleText_ = true;
 };
 
 typedef std::map<int, DrawColour> ColourPalette;
-typedef std::vector<unsigned int> DashPattern;
+typedef std::vector<double> DashPattern;
 
 inline void assignDefaultPalette(ColourPalette &palette) {
   palette.clear();
@@ -199,9 +202,9 @@ struct RDKIT_MOLDRAW2D_EXPORT MolDrawOptions {
       false;  // toggles replacing 2H with D and 3H with T
   bool dummiesAreAttachments = false;  // draws "breaks" at dummy atoms
   bool circleAtoms = true;             // draws circles under highlighted atoms
-  DrawColour highlightColour{1, 0.5, 0.5};  // default highlight color
-  bool continuousHighlight = true;          // highlight by drawing an outline
-                                            // *underneath* the molecule
+  DrawColour highlightColour{1, 0.5, 0.5, 1.0};  // default highlight color
+  bool continuousHighlight = true;  // highlight by drawing an outline
+                                    // *underneath* the molecule
   bool fillHighlights = true;     // fill the areas used to highlight atoms and
                                   // atom regions
   double highlightRadius = 0.3;   // default if nothing given for a particular
@@ -214,7 +217,7 @@ struct RDKIT_MOLDRAW2D_EXPORT MolDrawOptions {
   bool clearBackground = true;  // toggles clearing the background before
                                 // drawing a molecule
   DrawColour backgroundColour{
-      1, 1, 1};             // color to be used while clearing the background
+      1, 1, 1, 1};          // color to be used while clearing the background
   int legendFontSize = 16;  // font size (in pixels) to be used for the legend
                             // (if present)
   int maxFontSize = 40;  // maximum size in pixels for font in drawn molecule.
@@ -234,9 +237,11 @@ struct RDKIT_MOLDRAW2D_EXPORT MolDrawOptions {
                                             // around atom labels. Expressed as
                                             // a fraction of the font size.
   std::map<int, std::string> atomLabels;    // replacement labels for atoms
+  bool noAtomLabels =
+      false;  // disables inclusion of atom labels in the rendering
   std::vector<std::vector<int>> atomRegions;  // regions
   DrawColour symbolColour{
-      0, 0, 0};  // color to be used for the symbols and arrows in reactions
+      0, 0, 0, 1};  // color to be used for the symbols and arrows in reactions
   int bondLineWidth = 2;        // default line width when drawing bonds
   bool scaleBondWidth = false;  // whether to apply scale() to the bond width
   bool scaleHighlightBondWidth = true;   // likewise with bond highlights.
@@ -284,6 +289,18 @@ struct RDKIT_MOLDRAW2D_EXPORT MolDrawOptions {
   bool comicMode = false;  // simulate hand-drawn lines for bonds. When combined
                            // with a font like Comic-Sans or Comic-Neue, this
                            // gives xkcd-like drawings.
+  int variableBondWidthMultiplier = 16;  // what to multiply standard bond width
+                                         // by for variable attachment points.
+  double variableAtomRadius = 0.4;  // radius value to use for atoms involved in
+                                    // variable attachment points.
+  DrawColour variableAttachmentColour = {
+      0.8, 0.8, 0.8, 1.0};  // colour to use for variable attachment points
+  bool includeChiralFlagLabel =
+      false;  // add a molecule annotation with "ABS" if the chiral flag is set
+  bool simplifiedStereoGroupLabel =
+      false;  // if all specified stereocenters are in a single StereoGroup,
+              // show a molecule-level annotation instead of the individual
+              // labels
 
   MolDrawOptions() {
     highlightColourPalette.emplace_back(
@@ -602,6 +619,9 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
                             const DrawColour &col1, const DrawColour &col2,
                             unsigned int nSegments = 16,
                             double vertOffset = 0.05);
+  //! draw a line where the ends are different colours
+  virtual void drawLine(const Point2D &cds1, const Point2D &cds2,
+                        const DrawColour &col1, const DrawColour &col2);
   //! adds additional information about the atoms to the output. Does not make
   //! sense for all renderers.
   virtual void tagAtoms(const ROMol &mol) { RDUNUSED_PARAM(mol); };
@@ -635,6 +655,7 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
   void tabulaRasa();
 
   virtual bool supportsAnnotations() { return true; }
+  virtual void drawAnnotation(const AnnotationType &annotation);
 
  protected:
   std::unique_ptr<DrawText> text_drawer_;
@@ -665,7 +686,8 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
   std::vector<std::vector<std::pair<std::shared_ptr<StringRect>, OrientType>>>
       radicals_;
   Point2D bbox_[2];
-  std::vector<std::vector<MolDrawShape>> shapes_;
+  std::vector<std::vector<MolDrawShape>> pre_shapes_;
+  std::vector<std::vector<MolDrawShape>> post_shapes_;
 
   // return a DrawColour based on the contents of highlight_atoms or
   // highlight_map, falling back to atomic number by default
@@ -719,15 +741,17 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
                         const std::map<int, double> *highlight_radii,
                         Point2D &centre, double &xradius,
                         double &yradius) const;
-  // these both assume there is a note on the atom or bond.  That should
-  // have been checked by the calling function. StringRect will have a
-  // width of -1.0 if there's a problem.
-  StringRect calcAnnotationPosition(const ROMol &mol, const Atom *atom);
-  StringRect calcAnnotationPosition(const ROMol &mol, const Bond *bond);
+  // StringRect will have a width of -1.0 if there's a problem.
+  StringRect calcAnnotationPosition(const ROMol &mol, const Atom *atom,
+                                    const std::string &note);
+  StringRect calcAnnotationPosition(const ROMol &mol, const Bond *bond,
+                                    const std::string &note);
+  StringRect calcAnnotationPosition(const ROMol &mol, const std::string &note);
   // find where to put the given annotation around an atom.  Starting
   // search at angle start_ang, in degrees.
   void calcAtomAnnotationPosition(const ROMol &mol, const Atom *atom,
-                                  double start_ang, StringRect &rect);
+                                  double start_ang, StringRect &rect,
+                                  const std::string &note);
 
   // draw 1 or more coloured line along bonds
   void drawHighlightedBonds(
@@ -746,20 +770,15 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
 
   void extractAtomCoords(const ROMol &mol, int confId, bool updateBBox);
   void extractAtomSymbols(const ROMol &mol);
+  void extractMolNotes(const ROMol &mol);
   void extractAtomNotes(const ROMol &mol);
   void extractBondNotes(const ROMol &mol);
   void extractRadicals(const ROMol &mol);
+  void extractSGroupData(const ROMol &mol);
+  void extractVariableBonds(const ROMol &mol);
   void extractBrackets(const ROMol &mol);
+  void extractLinkNodes(const ROMol &mol);
 
-  // coords in atom coords
-  virtual void drawLine(const Point2D &cds1, const Point2D &cds2,
-                        const DrawColour &col1, const DrawColour &col2);
-  void drawWedgedBond(const Point2D &cds1, const Point2D &cds2,
-                      bool draw_dashed, const DrawColour &col1,
-                      const DrawColour &col2);
-  // draw an arrow for a dative bond, with the arrowhead at cds2.
-  void drawDativeBond(const Point2D &cds1, const Point2D &cds2,
-                      const DrawColour &col1, const DrawColour &col2);
   void drawAtomLabel(int atom_num,
                      const std::vector<int> *highlight_atoms = nullptr,
                      const std::map<int, DrawColour> *highlight_map = nullptr);
@@ -794,24 +813,11 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
       const StringRect &note_rect,
       const std::vector<std::shared_ptr<StringRect>> &rects) const;
 
-  // cds1 and cds2 are 2 atoms in a ring.  Returns the perpendicular pointing
-  // into the ring.
-  Point2D bondInsideRing(const ROMol &mol, const Bond *bond,
-                         const Point2D &cds1, const Point2D &cds2) const;
-  // cds1 and cds2 are 2 atoms in a chain double bond.  Returns the
-  // perpendicular pointing into the inside of the bond
-  Point2D bondInsideDoubleBond(const ROMol &mol, const Bond *bond) const;
-  // calculate normalised perpendicular to vector between two coords, such
-  // that
-  // it's inside the angle made between (1 and 2) and (2 and 3).
-  Point2D calcInnerPerpendicular(const Point2D &cds1, const Point2D &cds2,
-                                 const Point2D &cds3) const;
-
   // take the coords for atnum, with neighbour nbr_cds, and move cds out to
   // accommodate
   // the label associated with it.
-  void adjustBondEndForLabel(int atnum, const Point2D &nbr_cds,
-                             Point2D &cds) const;
+  void adjustBondEndForLabel(const std::pair<std::string, OrientType> &lbl,
+                             const Point2D &nbr_cds, Point2D &cds) const;
 
   // adds LaTeX-like annotation for super- and sub-script.
   std::pair<std::string, OrientType> getAtomSymbolAndOrientation(
@@ -858,7 +864,6 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
       const std::vector<std::pair<DrawColour, DrawColour>> *bond_colours =
           nullptr);
   virtual void drawAtomLabel(int atom_num, const DrawColour &draw_colour);
-  virtual void drawAnnotation(const AnnotationType &annotation);
   //! DEPRECATED
   virtual void drawAnnotation(const std::string &note,
                               const StringRect &note_rect) {
@@ -867,25 +872,6 @@ class RDKIT_MOLDRAW2D_EXPORT MolDraw2D {
     annot.rect_ = note_rect;
     drawAnnotation(annot);
   }
-
-  // calculate normalised perpendicular to vector between two coords
-  Point2D calcPerpendicular(const Point2D &cds1, const Point2D &cds2) const;
-  // assuming there's a double bond between atom1 and atom2, calculate
-  // the ends of the 2 lines that should be used to draw it, distance
-  // offset apart.  Includes bonds of type AROMATIC.
-  void calcDoubleBondLines(const ROMol &mol, double offset, const Bond *bond,
-                           const Point2D &at1_cds, const Point2D &at2_cds,
-                           Point2D &l1s, Point2D &l1f, Point2D &l2s,
-                           Point2D &l2f) const;
-  // returns true if atom has degree 2 and both bonds are close to
-  // linear.
-  bool isLinearAtom(const Atom &atom) const;
-  // and the same for triple bonds.  One line is from atom to atom,
-  // so it doesn't need a separate return.
-  void calcTripleBondLines(double offset, const Bond *bond,
-                           const Point2D &at1_cds, const Point2D &at2_cds,
-                           Point2D &l1s, Point2D &l1f, Point2D &l2s,
-                           Point2D &l2f) const;
 
   // calculate the width to draw a line in draw coords.
   virtual double getDrawLineWidth() const;

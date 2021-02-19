@@ -15,9 +15,12 @@
 #include <memory>
 #include <RDGeneral/test.h>
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/MolBundle.h>
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <GraphMol/FileParsers/FileParsers.h>
 #include <GraphMol/Fingerprints/Fingerprints.h>
+#include <GraphMol/Fingerprints/MorganFingerprints.h>
+#include <RDGeneral/Exceptions.h>
 #include <GraphMol/Fingerprints/RDKitFPGenerator.h>
 #include <GraphMol/Substruct/SubstructMatch.h>
 #include <DataStructs/ExplicitBitVect.h>
@@ -61,6 +64,21 @@ TEST_CASE("Github 2614", "[patternfp][bug]") {
   }
 }
 
+TEST_CASE("Github 1761", "[patternfp][bug]") {
+    SECTION("throw ValueErrorException") {
+        auto mol = "CCC1CC1"_smiles;
+        try
+        {
+            RDKit::MorganFingerprints::getHashedFingerprint(*mol, 0, 0);
+            FAIL("Expected ValueErrorException");
+        }
+        catch (const ValueErrorException &e)
+        {
+            REQUIRE(std::string(e.what()) == "nBits can not be zero");
+        }
+    }
+}
+
 TEST_CASE("RDKit bits per feature", "[fpgenerator][rdkit]") {
   auto m1 = "CCCO"_smiles;
   REQUIRE(m1);
@@ -78,8 +96,9 @@ TEST_CASE("RDKit bits per feature", "[fpgenerator][rdkit]") {
           std::string::npos);
   }
   SECTION("change numBitsPerFeature") {
-    // I won't lie: having to do this makes my head hurt, but fixing it to create a 
-    // ctor that takes a Parameters object is more effort than I can devote at the moment
+    // I won't lie: having to do this makes my head hurt, but fixing it to
+    // create a ctor that takes a Parameters object is more effort than I can
+    // devote at the moment
     unsigned int minPath = 1;
     unsigned int maxPath = 2;
     bool useHs = true;
@@ -102,5 +121,27 @@ TEST_CASE("RDKit bits per feature", "[fpgenerator][rdkit]") {
     CHECK(fp->getNumOnBits() == 4);
     CHECK(fpGenerator->infoString().find("bitsPerFeature=1") !=
           std::string::npos);
+  }
+}
+
+TEST_CASE("pattern fingerprints for MolBundles", "[patternfp]") {
+  SECTION("basics") {
+    boost::shared_ptr<ROMol> q1{SmilesToMol("OCCO")};
+    REQUIRE(q1);
+    boost::shared_ptr<ROMol> q2{SmilesToMol("OCCCO")};
+    REQUIRE(q2);
+    std::unique_ptr<ExplicitBitVect> pfp1{PatternFingerprintMol(*q1)};
+    REQUIRE(pfp1);
+    std::unique_ptr<ExplicitBitVect> pfp2{PatternFingerprintMol(*q2)};
+    REQUIRE(pfp2);
+
+    MolBundle bundle;
+    bundle.addMol(q1);
+    bundle.addMol(q2);
+    std::unique_ptr<ExplicitBitVect> pfp{PatternFingerprintMol(bundle)};
+    REQUIRE(pfp);
+    CHECK(((*pfp1) & (*pfp2)).getNumOnBits() > 0);
+    CHECK(((*pfp1) & (*pfp2)).getNumOnBits() == pfp->getNumOnBits());
+    CHECK(((*pfp1) & (*pfp2)) == *pfp);
   }
 }

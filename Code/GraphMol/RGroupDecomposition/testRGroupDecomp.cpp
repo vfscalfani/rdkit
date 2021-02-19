@@ -37,24 +37,41 @@
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
 #include <GraphMol/RGroupDecomposition/RGroupDecomp.h>
+#include <GraphMol/RGroupDecomposition/RGroupDecompData.h>
 #include <GraphMol/FileParsers/FileParsers.h>
 #include <GraphMol/FileParsers/MolSupplier.h>
 #include <RDGeneral/Exceptions.h>
 #include <boost/tokenizer.hpp>
 #include <regex>
 
+//#define DEBUG
+
 typedef boost::tokenizer<boost::char_separator<char>> tokenizer;
 
 using namespace RDKit;
 
+#ifdef DEBUG
+const bool DOASSERT = false;
+#else
+const bool DOASSERT = true;
+#endif
+
+typedef std::vector<std::unique_ptr<ROMol>> UMOLS;
+#define UPTR(m) std::unique_ptr<ROMol>(m)
+
 void CHECK_RGROUP(RGroupRows::const_iterator &it, const std::string &expected,
-                  bool doassert = true) {
+                  ROMol *mol = nullptr, bool doassert = DOASSERT) {
   std::ostringstream str;
   int i = 0;
-
+  std::unique_ptr<ROMol> res;
   for (auto rgroups = it->begin(); rgroups != it->end(); ++rgroups, ++i) {
     if (i) {
       str << " ";
+      if (mol) {
+        res = molzip(*res, *rgroups->second.get());
+      }
+    } else if (mol) {
+      res = std::unique_ptr<ROMol>(new ROMol(*rgroups->second.get()));
     }
     // rlabel:smiles
     str << rgroups->first << ":" << MolToSmiles(*rgroups->second.get(), true);
@@ -67,7 +84,12 @@ void CHECK_RGROUP(RGroupRows::const_iterator &it, const std::string &expected,
   }
 
   if (doassert) {
-    TEST_ASSERT(result == expected);
+    TEST_ASSERT(result == expected)
+    if (mol) {
+      auto smi1 = MolToSmiles(*res);
+      auto smi2 = MolToSmiles(*mol);
+      TEST_ASSERT(smi1 == smi2)
+    }
   }
 }
 
@@ -83,21 +105,26 @@ void DUMP_RGROUP(RGroupRows::const_iterator &it, std::string &result) {
   result = str.str();
 }
 
-const char *symdata[5] = {"c1(Cl)ccccc1", "c1c(Cl)cccc1", "c1c(Cl)cccc1",
+const char *symdata[5] = {"c1(Cl)ccccc1", "c1c(Cl)cccc1", "c1cccc(Cl)c1",
                           "c1cc(Cl)ccc1", "c1ccc(Cl)cc1"};
 
-void testSymmetryMatching() {
+void testSymmetryMatching(RGroupScore scoreMethod = Match) {
   BOOST_LOG(rdInfoLog)
       << "********************************************************\n";
-  BOOST_LOG(rdInfoLog) << "test rgroup decomp symmetry matching" << std::endl;
+  BOOST_LOG(rdInfoLog)
+      << "test rgroup decomp symmetry matching with score method "
+      << scoreMethod << std::endl;
 
+  UMOLS mols;
   RWMol *core = SmilesToMol("c1ccccc1");
-  RGroupDecomposition decomp(*core);
+  RGroupDecompositionParameters params;
+  params.scoreMethod = scoreMethod;
+  RGroupDecomposition decomp(*core, params);
   for (int i = 0; i < 5; ++i) {
     ROMol *mol = SmilesToMol(symdata[i]);
     int res = decomp.add(*mol);
     TEST_ASSERT(res == i);
-    delete mol;
+    mols.push_back(UPTR(mol));
   }
 
   decomp.process();
@@ -106,8 +133,80 @@ void testSymmetryMatching() {
   std::ostringstream str;
 
   // All Cl's should be labeled with the same rgroup
+  int i = 0;
+  for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
+       ++it, ++i) {
+    CHECK_RGROUP(it, "Core:c1ccc([*:1])cc1 R1:Cl[*:1]", mols[i].get());
+  }
+  delete core;
+}
+
+void testGaSymmetryMatching(RGroupScore scoreMethod) {
+  BOOST_LOG(rdInfoLog)
+      << "********************************************************\n";
+  BOOST_LOG(rdInfoLog)
+      << "test rgroup decomp symmetry matching using GA with scoring method "
+      << scoreMethod << std::endl;
+
+  UMOLS mols;
+  RWMol *core = SmilesToMol("c1ccccc1");
+  RGroupDecompositionParameters params;
+  params.matchingStrategy = GA;
+  params.scoreMethod = scoreMethod;
+  RGroupDecomposition decomp(*core, params);
+  for (int i = 0; i < 5; ++i) {
+    ROMol *mol = SmilesToMol(symdata[i]);
+    int res = decomp.add(*mol);
+    TEST_ASSERT(res == i);
+    mols.push_back(UPTR(mol));
+  }
+
+  decomp.process();
+  RGroupRows rows = decomp.getRGroupsAsRows();
+
+  std::ostringstream str;
+
+  // All Cl's should be labeled with the same rgroup
+  int i = 0;
+  for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
+       ++it, ++i) {
+    CHECK_RGROUP(it, "Core:c1ccc([*:1])cc1 R1:Cl[*:1]", mols[i].get());
+  }
+  delete core;
+}
+
+void testGaBatch() {
+  BOOST_LOG(rdInfoLog)
+      << "********************************************************\n";
+  BOOST_LOG(rdInfoLog)
+      << "test rgroup decomp symmetry matching using GA with parallel runs"
+      << std::endl;
+
+  UMOLS mols;
+  RWMol *core = SmilesToMol("c1ccccc1");
+  RGroupDecompositionParameters params;
+  params.matchingStrategy = GA;
+  params.scoreMethod = FingerprintVariance;
+  params.gaNumberRuns = 3;
+  params.gaParallelRuns = true;
+
+  RGroupDecomposition decomp(*core, params);
+  for (int i = 0; i < 5; ++i) {
+    ROMol *mol = SmilesToMol(symdata[i]);
+    int res = decomp.add(*mol);
+    TEST_ASSERT(res == i);
+    mols.push_back(UPTR(mol));
+  }
+
+  decomp.process();
+  RGroupRows rows = decomp.getRGroupsAsRows();
+
+  std::ostringstream str;
+
+  // All Cl's should be labeled with the same rgroup
+  int i = 0;
   for (RGroupRows::const_iterator it = rows.begin(); it != rows.end(); ++it) {
-    CHECK_RGROUP(it, "Core:c1ccc([*:1])cc1 R1:Cl[*:1]");
+    CHECK_RGROUP(it, "Core:c1ccc([*:1])cc1 R1:Cl[*:1]", mols[i].get());
   }
   delete core;
 }
@@ -123,6 +222,7 @@ void testRGroupOnlyMatching() {
   BOOST_LOG(rdInfoLog) << "test rgroup decomp rgroup only matching"
                        << std::endl;
 
+  UMOLS mols;
   RWMol *core = SmilesToMol("c1ccccc1[1*]");
   RGroupDecompositionParameters params;
   params.labels = IsotopeLabels;
@@ -134,10 +234,11 @@ void testRGroupOnlyMatching() {
     int res = decomp.add(*mol);
     if (i < 4) {
       TEST_ASSERT(res == i);
+      mols.push_back(UPTR(mol));
     } else {
       TEST_ASSERT(res == -1);
+      delete mol;
     }
-    delete mol;
   }
 
   decomp.process();
@@ -148,7 +249,7 @@ void testRGroupOnlyMatching() {
   int i = 0;
   for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
        ++it, ++i) {
-    CHECK_RGROUP(it, "Core:c1ccc([*:1])cc1 R1:Cl[*:1]");
+    CHECK_RGROUP(it, "Core:c1ccc([*:1])cc1 R1:Cl[*:1]", mols[i].get());
   }
   delete core;
 }
@@ -164,6 +265,7 @@ void testRingMatching() {
       << "********************************************************\n";
   BOOST_LOG(rdInfoLog) << "test rgroup decomp ring matching" << std::endl;
 
+  UMOLS mols;
   RWMol *core = SmilesToMol("c1ccc[1*]1");
   RGroupDecompositionParameters params;
   params.labels = IsotopeLabels;
@@ -173,7 +275,7 @@ void testRingMatching() {
     ROMol *mol = SmilesToMol(ringData[i]);
     int res = decomp.add(*mol);
     TEST_ASSERT(res == i);
-    delete mol;
+    mols.push_back(UPTR(mol));
   }
 
   decomp.process();
@@ -184,6 +286,7 @@ void testRingMatching() {
   int i = 0;
   for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
        ++it, ++i) {
+    // Ring rgroups not supported by molzip yet.
     CHECK_RGROUP(it, ringDataRes[i]);
   }
   delete core;
@@ -292,12 +395,12 @@ void testMultiCore() {
   cores.emplace_back(SmartsToMol("C1CCNCCC1"));
   cores.emplace_back(SmilesToMol("C1CCOCCC1"));
   cores.emplace_back(SmilesToMol("C1CCSCCC1"));
-
+  UMOLS mols;
   RGroupDecomposition decomp(cores);
   for (unsigned int i = 0; i < sizeof(coreSmi) / sizeof(const char *); ++i) {
     ROMol *mol = SmilesToMol(coreSmi[i]);
     unsigned int res = decomp.add(*mol);
-    delete mol;
+    mols.push_back(UPTR(mol));
     TEST_ASSERT(res == i);
   }
 
@@ -309,7 +412,8 @@ void testMultiCore() {
   int i = 0;
   for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
        ++it, ++i) {
-    CHECK_RGROUP(it, coreSmiRes[i]);
+    // molzip doesn't support double attachments yet (it probably should)
+    CHECK_RGROUP(it, coreSmiRes[i], nullptr, false);
   }
 }
 
@@ -425,7 +529,7 @@ void testGitHubIssue1705() {
       }
     }
     delete core;
-    TEST_ASSERT(ss.str() == R"RES(Rgroup===Core
+    std::string expected = R"RES(Rgroup===Core
 Oc1ccc([*:2])cc1[*:1]
 Oc1ccc([*:2])cc1[*:1]
 Oc1ccc([*:2])cc1[*:1]
@@ -443,7 +547,16 @@ Rgroup===R2
 [H][*:2]
 N[*:2]
 [H][*:2]
-)RES");
+)RES";
+#ifdef DEBUG
+    if (ss.str() != expected) {
+      std::cerr << __LINE__ << " ERROR got\n"
+                << ss.str() << "\nexpected\n"
+                << expected << std::endl;
+    }
+#else
+    TEST_ASSERT(ss.str() == expected);
+#endif
   }
 #endif
   // std::cerr<<"n\n\n\n\n\n--------------------------------------------------------------\n\n\n\n\n";
@@ -470,22 +583,31 @@ N[*:2]
       }
     }
     delete core;
-    TEST_ASSERT(ss.str() == R"RES(Rgroup===Core
+    std::string expected = R"RES(Rgroup===Core
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
 Rgroup===R1
 [H][*:1]
-[H][*:1]
-[H][*:1]
+F[*:1]
+F[*:1]
 F[*:1]
 Rgroup===R2
 [H][*:2]
+[H][*:2]
+[H][*:2]
 F[*:2]
-F[*:2]
-F[*:2]
-)RES");
+)RES";
+#ifdef DEBUG
+    if (ss.str() != expected) {
+      std::cerr << __LINE__ << " ERROR got\n"
+                << ss.str() << "\nexpected\n"
+                << expected << std::endl;
+    }
+#else
+    TEST_ASSERT(ss.str() == expected);
+#endif
   }
 }
 
@@ -575,6 +697,9 @@ M  END
 }
 
 void testSDFGRoupMultiCoreNoneShouldMatch() {
+  BOOST_LOG(rdInfoLog)
+      << "********************************************************\n";
+  BOOST_LOG(rdInfoLog) << "testSDFGRoupMultiCoreNoneShouldMatch" << std::endl;
   std::string sdcores = R"CTAB(
   Mrv1813 05061918272D          
 
@@ -848,20 +973,21 @@ $$$$)CTAB";
     RGroupRows rows = decomp.getRGroupsAsRows();
 
     const char *expected[4] = {
-        "Core:N1C(N([*:2])[*:4])C2C(NC1[*:1])[*:5]C([*:3])[*:6]2 "
+        "Core:N1C(N([*:2])[*:4])C2C(NC1[*:1])[*:5]C([*:3])[*:6]2 R1:[H][*:1] "
         "R2:C(CC[*:2])CC[*:4] R4:C(CC[*:2])CC[*:4] R5:N([*:5])[*:5] "
         "R6:C([*:6])[*:6]",
-        "Core:N1C(N([*:2])[*:4])C2C(NC1[*:1])[*:5]C([*:3])[*:6]2 "
+        "Core:N1C(N([*:2])[*:4])C2C(NC1[*:1])[*:5]C([*:3])[*:6]2 R1:[H][*:1] "
         "R2:C[*:2] R4:[H][*:4] R5:S([*:5])[*:5] R6:CC(C)C([*:6])[*:6]",
-        "Core:C1C([*:1])NC(N([*:2])[*:4])C2C1[*:5]C([*:3])[*:6]2 "
+        "Core:C1C([*:1])NC(N([*:2])[*:4])C2C1[*:5]C([*:3])[*:6]2 R1:[H][*:1] "
         "R2:C[*:2] R4:[H][*:4] R5:S([*:5])[*:5] R6:CC(C)C([*:6])[*:6]",
-        "Core:C1C([*:1])NC(N([*:2])[*:4])C2C1[*:5]C([*:3])[*:6]2 "
+        "Core:C1C([*:1])NC(N([*:2])[*:4])C2C1[*:5]C([*:3])[*:6]2 R1:O[*:1] "
         "R2:[H][*:2] R4:[H][*:4] R5:CN([*:5])[*:5] R6:N([*:6])[*:6]"};
 
     int i = 0;
     for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
          ++it, ++i) {
       TEST_ASSERT(i < 4);
+      // molzip doesn't support double attachment points yet
       CHECK_RGROUP(it, expected[i]);
     }
   }
@@ -902,7 +1028,7 @@ void testRowColumnAlignmentProblem() {
     int i = 0;
     for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
          ++it, ++i) {
-      CHECK_RGROUP(it, expected[i]);
+      CHECK_RGROUP(it, expected[i], mols[i].get());
     }
 
     for (const auto &row : rows) {
@@ -930,7 +1056,7 @@ void testRowColumnAlignmentProblem() {
 void testSymmetryIssues() {
   BOOST_LOG(rdInfoLog)
       << "********************************************************\n";
-  BOOST_LOG(rdInfoLog) << "Testing R-Group symmetry issues \n";
+  BOOST_LOG(rdInfoLog) << "Testing R-Group symmetry issues\n";
 
   auto m1 = "c1c(F)cccn1"_smiles;
   auto m2 = "c1c(Cl)c(C)ccn1"_smiles;
@@ -1025,7 +1151,7 @@ F[*:3]
 void testSymmetryPerformance() {
   BOOST_LOG(rdInfoLog)
       << "********************************************************\n";
-  BOOST_LOG(rdInfoLog) << "Testing R-Group symmetry issues \n";
+  BOOST_LOG(rdInfoLog) << "Testing R-Group symmetry performance\n";
   boost::logging::disable_logs("rdApp.warning");
 
   std::string smis =
@@ -1201,7 +1327,7 @@ Cn1cnc2cc(Oc3cc(N4CCN(Cc5ccccc5-c5ccc(Cl)cc5)CC4)ccc3C(=O)NS(=O)(=O)c3ccc(NCCCN4
 void testScorePermutations() {
   BOOST_LOG(rdInfoLog)
       << "********************************************************\n";
-  BOOST_LOG(rdInfoLog) << "Testing permutation scoring function \n";
+  BOOST_LOG(rdInfoLog) << "Testing permutation scoring function\n";
 
   {
     auto core = "Cc1ccccc1"_smiles;
@@ -1224,22 +1350,31 @@ void testScorePermutations() {
     }
     TEST_ASSERT(r_labels == std::set<std::string>({"Core", "R1", "R2"}));
     TEST_ASSERT(groups.size() == 3);
-    TEST_ASSERT(ss.str() == R"RES(Rgroup===Core
+    std::string expected = R"RES(Rgroup===Core
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
 Rgroup===R1
 [H][*:1]
-[H][*:1]
-[H][*:1]
+F[*:1]
+F[*:1]
 F[*:1]
 Rgroup===R2
 [H][*:2]
+[H][*:2]
+[H][*:2]
 F[*:2]
-F[*:2]
-F[*:2]
-)RES");
+)RES";
+#ifdef DEBUG
+    if (ss.str() != expected) {
+      std::cerr << __LINE__ << " ERROR got\n"
+                << ss.str() << "\nexpected\n"
+                << expected << std::endl;
+    }
+#else
+    TEST_ASSERT(ss.str() == expected);
+#endif
   }
   {
     auto core = "Cc1ccccc1"_smiles;
@@ -1263,7 +1398,7 @@ F[*:2]
     }
     TEST_ASSERT(r_labels == std::set<std::string>({"Core", "R1", "R2"}));
     TEST_ASSERT(groups.size() == 3);
-    TEST_ASSERT(ss.str() == R"RES(Rgroup===Core
+    std::string expected = R"RES(Rgroup===Core
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
 Cc1c([*:1])cccc1[*:2]
@@ -1278,7 +1413,16 @@ Cl[*:2]
 F[*:2]
 F[*:2]
 F[*:2]
-)RES");
+)RES";
+#ifdef DEBUG
+    if (ss.str() != expected) {
+      std::cerr << __LINE__ << " ERROR got\n"
+                << ss.str() << "\nexpected\n"
+                << expected << std::endl;
+    }
+#else
+    TEST_ASSERT(ss.str() == expected);
+#endif
   }
   {
     auto core = "O1C([*:1])([*:2])CCC1"_smiles;
@@ -1315,7 +1459,7 @@ F[*:2]
     }
     TEST_ASSERT(r_labels == std::set<std::string>({"Core", "R1", "R2"}));
     TEST_ASSERT(groups.size() == 3);
-    TEST_ASSERT(ss.str() == R"RES(Rgroup===Core
+    std::string expected = R"RES(Rgroup===Core
 C1COC([*:1])([*:2])C1
 C1COC([*:1])([*:2])C1
 C1COC([*:1])([*:2])C1
@@ -1357,7 +1501,16 @@ CC[*:2]
 OC[*:2]
 OC[*:2]
 CCCC[*:2]
-)RES");
+)RES";
+#ifdef DEBUG
+    if (ss.str() != expected) {
+      std::cerr << __LINE__ << " ERROR got\n"
+                << ss.str() << "\nexpected\n"
+                << expected << std::endl;
+    }
+#else
+    TEST_ASSERT(ss.str() == expected);
+#endif
   }
 }
 
@@ -1388,28 +1541,30 @@ void testMultiCorePreLabelled() {
       i = 0;
       for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
            ++it, ++i) {
-        CHECK_RGROUP(it, expectedRows[i] /*, false*/);
+        CHECK_RGROUP(it, expectedRows[i]);
       }
       RGroupColumns groups = decomp.getRGroupsAsColumns();
       i = 0;
-      TEST_ASSERT(groups.size() == 3);
+      TEST_ASSERT(groups.size() <= expectedLabels.size());
       for (const auto &pair : groups) {
-        /*
+#ifdef DEBUG
         if (pair.first != expectedLabels[i]) {
-          std::cerr << "ERROR: Expected " << expectedLabels[i] << ", got "
-                    << pair.first << std::endl;
+          std::cerr << __LINE__ << " ERROR: Expected " << expectedLabels[i]
+                    << ", got " << pair.first << std::endl;
         }
-        */
+#else
         TEST_ASSERT(pair.first == expectedLabels[i]);
+#endif
         unsigned int j = 0;
         for (const auto &item : pair.second) {
-          /*
+#ifdef DEBUG
           if (expectedItems[i][j] != MolToSmiles(*item)) {
-            std::cerr << "ERROR: Expected " << expectedItems[i][j] << ", got "
-                      << MolToSmiles(*item) << std::endl;
+            std::cerr << __LINE__ << " ERROR: Expected " << expectedItems[i][j]
+                      << ", got " << MolToSmiles(*item) << std::endl;
           }
-          */
+#else
           TEST_ASSERT(expectedItems[i][j] == MolToSmiles(*item));
+#endif
           ++j;
         }
         ++i;
@@ -1485,38 +1640,36 @@ $$$$
   while (!sdsup.atEnd()) {
     cores.emplace_back(sdsup.next());
   }
-  std::vector<std::string> expectedRowsAutodetect{
-      "Core:O=C(c1cncn1[*:2])[*:1] R1:CN[*:1] R2:CC[*:2]",
-      "Core:*1:*c2c(*c([*:2])c[*:1]2)nc1[*:3] R1:c(:[*:1]):[*:1] R2:Br[*:2]"};
-  std::vector<std::vector<std::string>> expectedItemsAutodetect{
-      {"O=C(c1cncn1[*:2])[*:1]", "*1:*c2c(*c([*:2])c[*:1]2)nc1[*:3]"},
-      {"CN[*:1]", "c(:[*:1]):[*:1]"},
-      {"CC[*:2]", "Br[*:2]"}};
-  std::vector<std::string> expectedRowsNoAutodetect{
+
+  std::vector<std::string> expectedRows{
       "Core:O=C(c1cncn1[*:2])[*:1] R1:CN[*:1] R2:CC[*:2]",
       "Core:*1:*c2*cc([*:2])*c2nc1[*:1] R1:F[*:1] R2:Br[*:2]"};
-  std::vector<std::vector<std::string>> expectedItemsNoAutodetect{
+
+  std::vector<std::vector<std::string>> expectedItems{
       {"O=C(c1cncn1[*:2])[*:1]", "*1:*c2*cc([*:2])*c2nc1[*:1]"},
       {"CN[*:1]", "F[*:1]"},
-      {"CC[*:2]", "Br[*:2]"}};
+      {"CC[*:2]", "Br[*:2]"},
+  };
+
   std::vector<std::string> expectedLabels{"Core", "R1", "R2"};
+
   RGroupDecompositionParameters params;
 
   // test pre-labelled with MDL R-group labels, autodetect
   params.labels = AutoDetect;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsAutodetect,
-                     expectedItemsAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
   // test pre-labelled with MDL R-group labels, no autodetect
   params.labels = MDLRGroupLabels | RelabelDuplicateLabels;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsNoAutodetect,
-                     expectedItemsNoAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
   // test pre-labelled with MDL R-group labels, autodetect, no MCS alignment
   params.labels = AutoDetect;
   params.alignment = NoAlignment;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsNoAutodetect,
-                     expectedItemsNoAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
 
   // Reading from a MDL molblock also sets isotopic labels, so no need
   // to set them again; we only clear MDL R-group labels
@@ -1530,18 +1683,18 @@ $$$$
   // test pre-labelled with isotopic labels, autodetect
   params.labels = AutoDetect;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsAutodetect,
-                     expectedItemsAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
   // test pre-labelled with isotopic labels, no autodetect
   params.labels = IsotopeLabels | RelabelDuplicateLabels;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsNoAutodetect,
-                     expectedItemsNoAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
   // test pre-labelled with isotopic labels, autodetect, no MCS alignment
   params.labels = AutoDetect;
   params.alignment = NoAlignment;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsNoAutodetect,
-                     expectedItemsNoAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
 
   for (auto &core : cores) {
     for (auto a : core->atoms()) {
@@ -1555,18 +1708,18 @@ $$$$
   // test pre-labelled with atom map labels, autodetect
   params.labels = AutoDetect;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsAutodetect,
-                     expectedItemsAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
   // test pre-labelled with atom map labels, no autodetect
   params.labels = AtomMapLabels | RelabelDuplicateLabels;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsNoAutodetect,
-                     expectedItemsNoAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
   // test pre-labelled with atom map labels, autodetect, no MCS alignment
   params.labels = AutoDetect;
   params.alignment = NoAlignment;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsNoAutodetect,
-                     expectedItemsNoAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
 
   for (auto &core : cores) {
     for (auto a : core->atoms()) {
@@ -1576,26 +1729,36 @@ $$$$
     }
   }
   // test pre-labelled with dummy atom labels, autodetect
-  expectedRowsAutodetect = std::vector<std::string>{
+
+  // Some of these patterns may merit further investigation
+  // such as c(:[*:1]):[*:1] may be better as c[*:1] and the first
+  // c(c:[*:5]):[*:4] should be c[*:4] and the second c[*:5]
+  expectedRows = std::vector<std::string>{
       "Core:O=C(c1cncn1[*:2])[*:1] R1:CN[*:1] R2:CC[*:2]",
       "Core:c1c([*:2])[*:3]c2nc([*:6])[*:5]:[*:4]c2[*:1]1 R1:c(:[*:1]):[*:1] "
-      "R2:Br[*:2]"};
-  expectedItemsAutodetect = std::vector<std::vector<std::string>>{
+      "R2:Br[*:2] R3:n(:[*:3]):[*:3] R4:c(c:[*:5]):[*:4] R5:c(c:[*:5]):[*:4] "
+      "R6:F[*:6]"};
+  expectedItems = std::vector<std::vector<std::string>>{
       {"O=C(c1cncn1[*:2])[*:1]",
        "c1c([*:2])[*:3]c2nc([*:6])[*:5]:[*:4]c2[*:1]1"},
       {"CN[*:1]", "c(:[*:1]):[*:1]"},
-      {"CC[*:2]", "Br[*:2]"}};
+      {"CC[*:2]", "Br[*:2]"},
+      {"", "n(:[*:3]):[*:3]"},
+      {"", "c(c:[*:5]):[*:4]"},
+      {"", "c(c:[*:5]):[*:4]"},
+      {"", "F[*:6]"}};
+  expectedLabels = {"Core", "R1", "R2", "R3", "R4", "R5", "R6"};
   params.labels = AutoDetect;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsAutodetect,
-                     expectedItemsAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
   // test pre-labelled with dummy atom labels, no autodetect
-  // in this case there is no difference from autodetect as the RGD code
-  // cannot tell the difference between query atoms and dummy R-groups
   params.labels = DummyAtomLabels | RelabelDuplicateLabels;
   params.alignment = MCS;
-  MultiCoreRGD::test(cores, params, expectedLabels, expectedRowsAutodetect,
-                     expectedItemsAutodetect);
+  MultiCoreRGD::test(cores, params, expectedLabels, expectedRows,
+                     expectedItems);
 }
 
 void testCoreWithRGroupAdjQuery() {
@@ -1653,14 +1816,213 @@ $$$$
   }
 }
 
+void testMutipleCoreRelabellingIssues() {
+  // This test fixes 2 issues with relabelling groups
+  // Firstly, a new R group which appeared in a later core could have it's label
+  // assigned to an unindexed group in a previous core
+  // Secondly, a user defined r group which is not part of the decomposition
+  // could have it's index assigned to an unindexed group.
+
+  // See https://github.com/rdkit/rdkit/pull/3565
+
+  BOOST_LOG(rdInfoLog)
+      << "********************************************************\n";
+  BOOST_LOG(rdInfoLog) << "Test relabelling issues in multiple core decomp"
+                       << std::endl;
+
+  std::vector<std::shared_ptr<ROMol>> molecules;
+  {
+    std::fstream fh;
+    std::string rdBase(getenv("RDBASE"));
+    fh.open(rdBase + "/Docs/Notebooks/compounds.txt", std::ios::in);
+    std::string line;
+    getline(fh, line);
+
+    while (getline(fh, line)) {
+      int pos = line.find_last_of("\t");
+      auto smiles = line.substr(pos + 1);
+      std::shared_ptr<ROMol> mol(SmilesToMol(smiles));
+      molecules.push_back(mol);
+      if (molecules.size() == 30) break;
+    }
+  }
+
+  std::vector<std::string> smi{
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)=C([*:3])CS2",
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)=C([*:3])CC2",
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)=C([*:3])CO2",
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)=C([*:3])C2",
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)C([*:3])([*:4])C2",
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)=C([*:3])S2",
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)C([*:3])([*:4])S2",
+      "O=C1C([*:2])([*:1])[C@@H]2N1C(C(O)=O)C([*:3])([*:4])O2",
+      "O=C1C([*:2])([*:1])C([*:6])([*:5])N1"};
+  std::vector<ROMOL_SPTR> cores;
+  for (const auto &s : smi) {
+    cores.emplace_back(SmartsToMol(s));
+  }
+
+  RGroupDecompositionParameters params;
+  params.scoreMethod = FingerprintVariance;
+  RGroupDecomposition decomposition(cores, params);
+  for (auto &mol : molecules) {
+    decomposition.add(*mol);
+  }
+
+  decomposition.process();
+  const auto &columns = decomposition.getRGroupsAsColumns();
+  TEST_ASSERT(columns.size() == 8u);
+  for (auto &col : columns) {
+    TEST_ASSERT(30U == col.second.size());
+  }
+}
+
+void testUnprocessedMapping() {
+  // Tests a bug that results in an unprocessed mapping Invariant violation
+  // The cause of the error is an rgroup mistakenly idetified as containing only
+  // hydrogens in a multicore decomp
+
+  // See https://github.com/rdkit/rdkit/pull/3565
+
+  BOOST_LOG(rdInfoLog)
+      << "********************************************************\n";
+  BOOST_LOG(rdInfoLog)
+      << "Test unprocessed mapping error in multiple core decomp" << std::endl;
+  std::vector<std::string> structureSmi = {
+      "Cn1nc(-c2ccccc2)cc1OC1CCC(OC2CCN(C(=O)OC(C)(C)C)CC2)CC1",
+      "Cc1cccc(N2CCN(c3ncnc(Nc4ccc(S(C)(=O)=O)nc4C)c3F)[C@@H](C)C2)c1",
+      "CC(C)(C)OC(=O)N1CCC(OCC2CCCCC2COc2ccc(Br)nn2)CC1",
+      "CC(C)(C)OC(=O)N1CCC(CO[C@H]2CC[C@@H](c3ccc(S(C)(=O)=O)nc3)CC2)CC1",
+      "CCCCCCCC/"
+      "C=C\\CCCCCCCC(=O)Oc1ccc2c(c1)CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12"};
+  std::vector<std::string> coreSmi = {"N1([*:1])CCN([*:2])CC1",
+                                      "C1(O[*:1])CCC(O[*:2])CC1",
+                                      "C1([*:1])CCC([*:2])CC1"};
+
+  std::vector<ROMOL_SPTR> cores;
+  for (const auto &s : coreSmi) {
+    cores.emplace_back(SmartsToMol(s));
+  }
+
+  RGroupDecompositionParameters params;
+  params.scoreMethod = FingerprintVariance;
+  RGroupDecomposition decomposition(cores, params);
+  for (auto &smi : structureSmi) {
+    auto mol = SmilesToMol(smi);
+    decomposition.add(*mol);
+    delete mol;
+  }
+
+  auto result = decomposition.processAndScore();
+  TEST_ASSERT(result.success);
+  TEST_ASSERT(result.score != -1.0);
+}
+
+void testGeminalRGroups() {
+  BOOST_LOG(rdInfoLog)
+      << "********************************************************\n";
+  BOOST_LOG(rdInfoLog) << "test core with geminal R-groups" << std::endl;
+  std::string core_ctab = R"CTAB(
+     RDKit          2D
+
+  8  8  0  0  0  0  0  0  0  0999 V2000
+   -0.6026    1.2267    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.3171    0.8142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.3171   -0.0108    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -0.6026   -0.4232    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    0.1118   -0.0108    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    0.1118    0.8142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+   -1.0714    1.7839    0.0000 R#  0  0  0  0  0  0  0  0  0  0  0  0
+   -0.0506    1.8398    0.0000 R#  0  0  0  0  0  0  0  0  0  0  0  0
+  2  3  1  0  0  0  0
+  3  4  1  0  0  0  0
+  4  5  1  0  0  0  0
+  5  6  1  0  0  0  0
+  1  2  1  0  0  0  0
+  1  6  1  0  0  0  0
+  1  7  1  0  0  0  0
+  1  8  1  0  0  0  0
+M  RGP  2   7   5   8   6
+M  END
+)CTAB";
+  ROMOL_SPTR core(MolBlockToMol(core_ctab));
+  const std::vector<const char *> smilesData{"C1CCCCC12CC2", "C1CCCCC1(C)C",
+                                             "C1CCCCC1(Cl)Br"};
+
+  // the test should yield the same results irrespective of the permutations
+  // across the two parameters
+  for (auto matchAtRGroup = 0; matchAtRGroup < 2; ++matchAtRGroup) {
+    for (auto mdlRGroupLabels = 0; mdlRGroupLabels < 2; ++mdlRGroupLabels) {
+      RGroupDecompositionParameters params;
+      if (matchAtRGroup) {
+        params.labels = MDLRGroupLabels;
+      }
+      if (mdlRGroupLabels) {
+        params.labels = MDLRGroupLabels;
+      }
+      RGroupDecomposition decomp(*core, params);
+      for (const auto &smi : smilesData) {
+        ROMol *mol = SmilesToMol(smi);
+        TEST_ASSERT(decomp.add(*mol) != -1);
+        delete mol;
+      }
+      TEST_ASSERT(decomp.process());
+      auto rows = decomp.getRGroupsAsRows();
+      const std::vector<const char *> res{
+          "Core:C1CCC([*:5])([*:6])CC1 R5:C(C[*:6])[*:5] R6:C(C[*:6])[*:5]",
+          "Core:C1CCC([*:5])([*:6])CC1 R5:C[*:5] R6:C[*:6]",
+          "Core:C1CCC([*:5])([*:6])CC1 R5:Br[*:5] R6:Cl[*:6]"};
+      TEST_ASSERT(rows.size() == res.size());
+      size_t i = 0;
+      for (RGroupRows::const_iterator it = rows.begin(); it != rows.end();
+           ++it) {
+        CHECK_RGROUP(it, res.at(i++));
+      }
+    }
+  }
+}
+
+void testNoAlignmentAndSymmetry() {
+  BOOST_LOG(rdInfoLog)
+      << "********************************************************\n";
+  BOOST_LOG(rdInfoLog) << "test NoAlignment with symmetric groups" << std::endl;
+  const std::vector<ROMOL_SPTR> cores{"[cH:1]1[cH:2][cH:3]ccc1"_smiles,
+                                      "[cH:3]1[cH:2][cH:1]cnc1"_smiles};
+  const std::vector<const char *> smilesData{"c1(CO)c(F)c(CN)ccc1",
+                                             "c1(CO)c(Cl)c(CN)cnc1"};
+
+  RGroupDecompositionParameters params;
+  params.onlyMatchAtRGroups = true;
+  params.removeHydrogensPostMatch = true;
+  params.alignment = NoAlignment;
+  RGroupDecomposition decomp(cores, params);
+  size_t i = 0;
+  for (const auto &smi : smilesData) {
+    ROMOL_SPTR mol(static_cast<ROMol *>(SmilesToMol(smi)));
+    TEST_ASSERT(decomp.add(*mol) == i++);
+  }
+  TEST_ASSERT(decomp.process());
+  auto rows = decomp.getRGroupsAsRows();
+  const std::vector<const char *> res{
+      "Core:c1cc([*:1])c([*:2])c([*:3])c1 R1:NC[*:1] R2:F[*:2] R3:OC[*:3]",
+      "Core:c1ncc([*:3])c([*:2])c1[*:1] R1:NC[*:1] R2:Cl[*:2] R3:OC[*:3]"};
+  TEST_ASSERT(rows.size() == res.size());
+  i = 0;
+  for (RGroupRows::const_iterator it = rows.begin(); it != rows.end(); ++it) {
+    CHECK_RGROUP(it, res.at(i++));
+  }
+}
+
 int main() {
   RDLog::InitLogs();
+  boost::logging::disable_logs("rdApp.debug");
 
   BOOST_LOG(rdInfoLog)
       << "********************************************************\n";
   BOOST_LOG(rdInfoLog) << "Testing R-Group Decomposition \n";
 
 #if 1
+  testSymmetryMatching(FingerprintVariance);
   testSymmetryMatching();
   testRGroupOnlyMatching();
   testRingMatching();
@@ -1676,11 +2038,21 @@ int main() {
   testSDFGRoupMultiCoreNoneShouldMatch();
   testRowColumnAlignmentProblem();
   testSymmetryIssues();
+  testMutipleCoreRelabellingIssues();
+
+  testGaSymmetryMatching(FingerprintVariance);
+  testGaSymmetryMatching(Match);
+  testGaSymmetryMatching(FingerprintDistance);
+  testGaBatch();
+
+  testUnprocessedMapping();
 #endif
   testSymmetryPerformance();
   testScorePermutations();
   testMultiCorePreLabelled();
   testCoreWithRGroupAdjQuery();
+  testGeminalRGroups();
+  testNoAlignmentAndSymmetry();
   BOOST_LOG(rdInfoLog)
       << "********************************************************\n";
   return 0;

@@ -43,8 +43,6 @@
 #include <utility>
 #include <vector>
 
-// #define DEBUG
-
 namespace RDKit {
 
 // Attachment Points
@@ -58,12 +56,12 @@ const std::string CORE = "Core";
 const std::string RPREFIX = "R";
 
 namespace {
-void ADD_MATCH(R_DECOMP &match, int rlabel) {                                                                                     
-  if (match.find(rlabel) == match.end()) {                                                                                        
-    match[rlabel] = boost::make_shared<RGroupData>();                                                                             
-  }                                                                                                                               
-} 
+void ADD_MATCH(R_DECOMP &match, int rlabel) {
+  if (match.find(rlabel) == match.end()) {
+    match[rlabel] = boost::make_shared<RGroupData>();
+  }
 }
+}  // namespace
 
 RGroupDecomposition::RGroupDecomposition(
     const ROMol &inputCore, const RGroupDecompositionParameters &params)
@@ -136,7 +134,7 @@ int RGroupDecomposition::add(const ROMol &inmol) {
       tmatches = tmatches_filtered;
     }
 
-    if (!tmatches.size()) {
+    if (tmatches.empty()) {
       continue;
     } else {
       if (tmatches.size() > 1) {
@@ -157,6 +155,7 @@ int RGroupDecomposition::add(const ROMol &inmol) {
   }
 
   if (rcore == nullptr) {
+    BOOST_LOG(rdDebugLog) << "No core matches" << std::endl;
     return -1;
   }
 
@@ -169,8 +168,6 @@ int RGroupDecomposition::add(const ROMol &inmol) {
 
   //  Should probably scan all mols first to find match with
   //  smallest number of matches...
-  size_t size = data->matches.size();
-
   std::vector<RGroupMatch> potentialMatches;
 
   std::unique_ptr<ROMol> tMol;
@@ -191,7 +188,7 @@ int RGroupDecomposition::add(const ROMol &inmol) {
         std::vector<int> attachments;
         boost::shared_ptr<ROMol> &newMol = fragments[i];
         newMol->setProp<int>("core", core_idx);
-        newMol->setProp<int>("idx", size);
+        newMol->setProp<int>("idx", data->matches.size());
         newMol->setProp<int>("frag_idx", i);
 
         for (auto at : newMol->atoms()) {
@@ -271,41 +268,45 @@ int RGroupDecomposition::add(const ROMol &inmol) {
   if (potentialMatches.size() == 0) {
     BOOST_LOG(rdWarningLog)
         << "No attachment points in side chains" << std::endl;
-
     return -1;
   }
 
-  size_t N = 1;
-  for (auto &matche : data->matches) {
-    size_t sz = matche.size();
-    N *= sz;
-  }
-  // oops, exponential is a pain
-  if (N * potentialMatches.size() > 100000) {
-    data->permutation = std::vector<size_t>(data->matches.size(), 0);
-    data->process(true);
+  if (data->params.matchingStrategy != GA) {
+    size_t N = 1;
+    for (auto &matche : data->matches) {
+      size_t sz = matche.size();
+      N *= sz;
+    }
+    // oops, exponential is a pain
+    if (N * potentialMatches.size() > 100000) {
+      data->permutation = std::vector<size_t>(data->matches.size(), 0);
+      data->process(true);
+    }
   }
 
   data->matches.push_back(potentialMatches);
   data->permutation = std::vector<size_t>(data->matches.size(), 0);
 
-  if (size) {
+  if (data->matches.size()) {
     if (data->params.matchingStrategy & Greedy ||
-        (data->params.matchingStrategy & GreedyChunks && size > 1 &&
-         size % data->params.chunkSize == 0)) {
+        (data->params.matchingStrategy & GreedyChunks &&
+         data->matches.size() > 1 &&
+         data->matches.size() % data->params.chunkSize == 0)) {
       data->process(true);
     }
   }
   return data->matches.size() - 1;
 }
 
-bool RGroupDecomposition::process() {
+bool RGroupDecomposition::process() { return processAndScore().success; }
+
+RGroupDecompositionProcessResult RGroupDecomposition::processAndScore() {
   try {
     const bool prune = true;
     const bool finalize = true;
     return data->process(prune, finalize);
   } catch (...) {
-    return false;
+    return RGroupDecompositionProcessResult(false, -1);
   }
 }
 
@@ -371,6 +372,8 @@ RGroupColumns RGroupDecomposition::getRGroupsAsColumns() const {
       CHECK_INVARIANT(rgroup.second->combinedMol->hasProp(done),
                       "Not done! Call process()");
 
+      CHECK_INVARIANT(!Rs_seen[rgrp_pos_map[realLabel->second]],
+                      "R group label appears multiple times!");
       Rs_seen.set(rgrp_pos_map[realLabel->second]);
       std::string r = RPREFIX + std::to_string(realLabel->second);
       RGroupColumn &col = groups[r];

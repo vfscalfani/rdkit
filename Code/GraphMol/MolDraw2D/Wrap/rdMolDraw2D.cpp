@@ -25,6 +25,10 @@
 #include <cairo.h>
 #include <GraphMol/MolDraw2D/MolDraw2DCairo.h>
 #endif
+#ifdef RDK_BUILD_QT_SUPPORT
+#include <GraphMol/MolDraw2D/MolDraw2DQt.h>
+#include <QPainter>
+#endif
 
 namespace python = boost::python;
 
@@ -144,6 +148,7 @@ void pyDictToMapColourVec(python::object pyo,
     res[python::extract<int>(tDict.keys()[i])] = v;
   }
 }
+
 std::map<int, std::vector<DrawColour>> *pyDictToMapColourVec(
     python::object pyo) {
   std::map<int, std::vector<DrawColour>> *res = nullptr;
@@ -412,6 +417,13 @@ python::object getSymbolColour(const RDKit::MolDrawOptions &self) {
 void setSymbolColour(RDKit::MolDrawOptions &self, python::tuple tpl) {
   self.symbolColour = pyTupleToDrawColour(tpl);
 }
+python::object getVariableAttachmentColour(const RDKit::MolDrawOptions &self) {
+  return colourToPyTuple(self.variableAttachmentColour);
+}
+void setVariableAttachmentColour(RDKit::MolDrawOptions &self,
+                                 python::tuple tpl) {
+  self.variableAttachmentColour = pyTupleToDrawColour(tpl);
+}
 void useDefaultAtomPalette(RDKit::MolDrawOptions &self) {
   assignDefaultPalette(self.atomColourPalette);
 }
@@ -543,6 +555,37 @@ void setDrawerColour(RDKit::MolDraw2D &self, python::tuple tpl) {
   self.setColour(pyTupleToDrawColour(tpl));
 }
 
+#ifdef RDK_BUILD_QT_SUPPORT
+MolDraw2DQt *moldrawFromQPainter(int width, int height, unsigned long ptr,
+                                 int panelWidth, int panelHeight) {
+  if (!ptr) {
+    throw_value_error("QPainter pointer is null");
+  }
+  QPainter *qptr = reinterpret_cast<QPainter *>(ptr);
+  return new MolDraw2DQt(width, height, qptr, panelWidth, panelHeight);
+}
+#endif
+
+void updateParamsHelper(MolDraw2D *obj, std::string json) {
+  MolDraw2DUtils::updateDrawerParamsFromJSON(*obj, json);
+}
+
+std::string molToSVG(const ROMol &mol, unsigned int width, unsigned int height,
+                     python::object pyHighlightAtoms, bool kekulize,
+                     unsigned int lineWidthMult, bool includeAtomCircles,
+                     int confId) {
+  RDUNUSED_PARAM(kekulize);
+  std::unique_ptr<std::vector<int>> highlightAtoms =
+      pythonObjectToVect(pyHighlightAtoms, static_cast<int>(mol.getNumAtoms()));
+  std::stringstream outs;
+  MolDraw2DSVG drawer(width, height, outs);
+  drawer.setLineWidth(drawer.lineWidth() * lineWidthMult);
+  drawer.drawOptions().circleAtoms = includeAtomCircles;
+  drawer.drawMolecule(mol, highlightAtoms.get(), nullptr, nullptr, confId);
+  drawer.finishDrawing();
+  return outs.str();
+}
+
 }  // namespace RDKit
 
 BOOST_PYTHON_MODULE(rdMolDraw2D) {
@@ -670,6 +713,8 @@ BOOST_PYTHON_MODULE(rdMolDraw2D) {
                      &RDKit::MolDrawOptions::additionalAtomLabelPadding,
                      "additional padding to leave around atom labels. "
                      "Expressed as a fraction of the font size.")
+      .def_readwrite("noAtomLabels", &RDKit::MolDrawOptions::noAtomLabels,
+                     "disables inclusion of atom labels in the rendering")
       .def_readwrite("explicitMethyl", &RDKit::MolDrawOptions::explicitMethyl,
                      "Draw terminal methyls explictly.  Default is false.")
       .def_readwrite(
@@ -683,7 +728,28 @@ BOOST_PYTHON_MODULE(rdMolDraw2D) {
       .def_readwrite("comicMode", &RDKit::MolDrawOptions::comicMode,
                      "simulate hand-drawn lines for bonds. When combined with "
                      "a font like Comic-Sans or Comic-Neue, this gives "
-                     "xkcd-like drawings. Default is false.");
+                     "xkcd-like drawings. Default is false.")
+      .def_readwrite("variableBondWidthMultiplier",
+                     &RDKit::MolDrawOptions::variableBondWidthMultiplier,
+                     "what to multiply standard bond width by for variable "
+                     "attachment points.")
+      .def_readwrite("variableAtomRadius",
+                     &RDKit::MolDrawOptions::variableAtomRadius,
+                     "radius value to use for atoms involved in variable "
+                     "attachment points.")
+      .def_readwrite("includeChiralFlagLabel",
+                     &RDKit::MolDrawOptions::includeChiralFlagLabel,
+                     "add a molecule annotation with \"ABS\" if the chiral "
+                     "flag is set. Default is false.")
+      .def_readwrite("simplifiedStereoGroupLabel",
+                     &RDKit::MolDrawOptions::simplifiedStereoGroupLabel,
+                     "if all specified stereocenters are in a single "
+                     "StereoGroup, show a molecule-level annotation instead of "
+                     "the individual labels. Default is false.")
+      .def("getVariableAttachmentColour", &RDKit::getVariableAttachmentColour,
+           "method for getting the colour of variable attachment points")
+      .def("setVariableAttachmentColour", &RDKit::setVariableAttachmentColour,
+           "method for setting the colour of variable attachment points");
   docString = "Drawer abstract base class";
   python::class_<RDKit::MolDraw2D, boost::noncopyable>(
       "MolDraw2D", docString.c_str(), python::no_init)
@@ -867,12 +933,28 @@ BOOST_PYTHON_MODULE(rdMolDraw2D) {
       .def("WriteDrawingText", &RDKit::MolDraw2DCairo::writeDrawingText,
            "write the PNG data to the named file");
 #endif
+#ifdef RDK_BUILD_QT_SUPPORT
+  docString = "Qt molecule drawer";
+  python::class_<RDKit::MolDraw2DQt, python::bases<RDKit::MolDraw2D>,
+                 boost::noncopyable>("MolDraw2DQt", docString.c_str(),
+                                     python::no_init);
+  python::def("MolDraw2DFromQPainter_", RDKit::moldrawFromQPainter,
+              (python::arg("width"), python::arg("height"),
+               python::arg("pointer_to_QPainter"),
+               python::arg("panelWidth") = -1, python::arg("panelHeight") = -1),
+              "Returns a MolDraw2DQt instance set to use a QPainter.\nUse "
+              "sip.unwrapinstance(qptr) to get the required pointer "
+              "information. Please note that this is somewhat fragile.",
+              python::return_value_policy<python::manage_new_object>());
+#endif
   docString =
       "Does some cleanup operations on the molecule to prepare it to draw "
       "nicely.\n"
-      "The operations include: kekulization, addition of chiral Hs (so that we "
+      "The operations include: kekulization, addition of chiral Hs (so "
+      "that we "
       "can draw\n"
-      "wedges to them), wedging of bonds at chiral centers, and generation of "
+      "wedges to them), wedging of bonds at chiral centers, and generation "
+      "of "
       "a 2D\n"
       "conformation if the molecule does not already have a conformation\n"
       "\nReturns a modified copy of the molecule.\n";
@@ -986,5 +1068,19 @@ BOOST_PYTHON_MODULE(rdMolDraw2D) {
        python::arg("levels") = python::object(),
        python::arg("params") = RDKit::MolDraw2DUtils::ContourParams(),
        python::arg("mol") = python::object()),
+      docString.c_str());
+
+  python::def("UpdateDrawerParamsFromJSON", RDKit::updateParamsHelper,
+              (python::arg("drawer"), python::arg("json")));
+
+  // ------------------------------------------------------------------------
+  docString = "Returns svg for a molecule";
+  python::def(
+      "MolToSVG", &RDKit::molToSVG,
+      (python::arg("mol"), python::arg("width") = 300,
+       python::arg("height") = 300,
+       python::arg("highlightAtoms") = python::object(),
+       python::arg("kekulize") = true, python::arg("lineWidthMult") = 1,
+       python::arg("fontSize") = 12, python::arg("includeAtomCircles") = true),
       docString.c_str());
 }

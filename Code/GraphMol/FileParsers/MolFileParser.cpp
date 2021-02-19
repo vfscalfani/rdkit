@@ -1642,29 +1642,14 @@ Bond *ParseMolFileBondLine(const std::string &text, unsigned int line) {
         BOND_NULL_QUERY *q;
         q = makeBondNullQuery();
         res->setQuery(q);
+      } else if (bType == 5) {
+        res->setQuery(makeSingleOrDoubleBondQuery());
+        res->setProp(common_properties::_MolFileBondQuery, 1);
       } else if (bType == 6) {
         res->setQuery(makeSingleOrAromaticBondQuery());
         res->setProp(common_properties::_MolFileBondQuery, 1);
-      } else if (bType == 5 || bType == 7) {
-        BOND_OR_QUERY *q;
-        q = new BOND_OR_QUERY;
-        if (bType == 5) {
-          // single or double
-          q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-              makeBondOrderEqualsQuery(Bond::SINGLE)));
-          q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-              makeBondOrderEqualsQuery(Bond::DOUBLE)));
-          q->setDescription("BondOr");
-          res->setProp(common_properties::_MolFileBondQuery, 1);
-        } else if (bType == 7) {
-          // double or aromatic
-          q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-              makeBondOrderEqualsQuery(Bond::DOUBLE)));
-          q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-              makeBondOrderEqualsQuery(Bond::AROMATIC)));
-          q->setDescription("BondOr");
-        }
-        res->setQuery(q);
+      } else if (bType == 7) {
+        res->setQuery(makeDoubleOrAromaticBondQuery());
         res->setProp(common_properties::_MolFileBondQuery, 1);
       } else {
         BOND_NULL_QUERY *q;
@@ -1744,7 +1729,7 @@ Bond *ParseMolFileBondLine(const std::string &text, unsigned int line) {
     }
   }
   return res;
-}
+}  // namespace
 
 void ParseMolBlockAtoms(std::istream *inStream, unsigned int &line,
                         unsigned int nAtoms, RWMol *mol, Conformer *conf) {
@@ -1805,6 +1790,33 @@ void ParseMolBlockBonds(std::istream *inStream, unsigned int &line,
     mol->addBond(bond, true);
     mol->setBondBookmark(bond, i);
   }
+}
+
+bool checkAttachmentPointsAreValid(
+    const RWMol *mol, std::pair<const int, SubstanceGroup> &sgroup) {
+  bool res = true;
+  int nAtoms = static_cast<int>(mol->getNumAtoms());
+  std::vector<SubstanceGroup::AttachPoint> &attachPoints =
+      sgroup.second.getAttachPoints();
+  for (auto &attachPoint : attachPoints) {
+    if (attachPoint.lvIdx == nAtoms) {
+      const std::vector<unsigned int> &bonds = sgroup.second.getBonds();
+      if (bonds.size() == 1) {
+        const auto bond = mol->getBondWithIdx(bonds.front());
+        if (bond->getBeginAtomIdx() == attachPoint.aIdx ||
+            bond->getEndAtomIdx() == attachPoint.aIdx) {
+          attachPoint.lvIdx = bond->getOtherAtomIdx(attachPoint.aIdx);
+        }
+      }
+    }
+    if (attachPoint.lvIdx == nAtoms) {
+      BOOST_LOG(rdWarningLog)
+          << "Could not infer missing lvIdx on malformed SAP line for SGroup "
+          << sgroup.first << std::endl;
+      res = false;
+    }
+  }
+  return res;
 }
 
 bool ParseMolBlockProperties(std::istream *inStream, unsigned int &line,
@@ -1894,47 +1906,48 @@ bool ParseMolBlockProperties(std::istream *inStream, unsigned int &line,
 
       /* SGroup parsing start */
     } else if (lineBeg == "M  STY") {
-      ParseSGroupV2000STYLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000STYLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SST") {
-      ParseSGroupV2000SSTLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SSTLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SLB") {
-      ParseSGroupV2000SLBLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SLBLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SCN") {
-      ParseSGroupV2000SCNLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SCNLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SDS") {
-      ParseSGroupV2000SDSLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SDSLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SAL" || lineBeg == "M  SBL" ||
                lineBeg == "M  SPA") {
-      ParseSGroupV2000VectorDataLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000VectorDataLine(sGroupMap, mol, tempStr, line,
+                                     strictParsing);
     } else if (lineBeg == "M  SMT") {
-      ParseSGroupV2000SMTLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SMTLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SDI") {
-      ParseSGroupV2000SDILine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SDILine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  CRS") {
       std::ostringstream errout;
       errout << "Unsupported SGroup subtype '" << lineBeg << "' on line "
              << line;
       throw FileParseException(errout.str());
     } else if (lineBeg == "M  SBV") {
-      ParseSGroupV2000SBVLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SBVLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SDT") {
-      ParseSGroupV2000SDTLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SDTLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SDD") {
-      ParseSGroupV2000SDDLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SDDLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SCD" || lineBeg == "M  SED") {
       ParseSGroupV2000SCDSEDLine(sGroupMap, dataFieldsMap, mol, tempStr, line,
                                  strictParsing, SCDcounter, lastDataSGroup,
                                  currentDataField);
     } else if (lineBeg == "M  SPL") {
-      ParseSGroupV2000SPLLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SPLLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SNC") {
-      ParseSGroupV2000SNCLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SNCLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SAP") {
-      ParseSGroupV2000SAPLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SAPLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SCL") {
-      ParseSGroupV2000SCLLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SCLLine(sGroupMap, mol, tempStr, line, strictParsing);
     } else if (lineBeg == "M  SBT") {
-      ParseSGroupV2000SBTLine(sGroupMap, mol, tempStr, line);
+      ParseSGroupV2000SBTLine(sGroupMap, mol, tempStr, line, strictParsing);
 
       /* SGroup parsing end */
     } else if (lineBeg == "M  ZBO") {
@@ -1956,9 +1969,23 @@ bool ParseMolBlockProperties(std::istream *inStream, unsigned int &line,
   }
   if (tempStr[0] == 'M' && tempStr.substr(0, 6) == "M  END") {
     // All went well, make final updates to SGroups, and add them to Mol
-    for (const auto &sgroup : sGroupMap) {
-      sgroup.second.setProp("DATAFIELDS", dataFieldsMap[sgroup.first]);
-      addSubstanceGroup(*mol, sgroup.second);
+    for (auto &sgroup : sGroupMap) {
+      if (sgroup.second.getIsValid()) {
+        sgroup.second.setProp("DATAFIELDS", dataFieldsMap[sgroup.first]);
+        sgroup.second.setIsValid(checkAttachmentPointsAreValid(mol, sgroup));
+      }
+      if (sgroup.second.getIsValid()) {
+        addSubstanceGroup(*mol, sgroup.second);
+      } else {
+        std::ostringstream errout;
+        errout << "SGroup " << sgroup.first << " is invalid";
+        if (strictParsing) {
+          throw FileParseException(errout.str());
+        } else {
+          BOOST_LOG(rdWarningLog)
+              << errout.str() << " and will be ignored" << std::endl;
+        }
+      }
     }
 
     fileComplete = true;
@@ -2465,29 +2492,15 @@ void ParseV3000BondBlock(std::istream *inStream, unsigned int &line,
           BOND_NULL_QUERY *q;
           q = makeBondNullQuery();
           bond->setQuery(q);
+        } else if (bType == 5) {
+          bond->setQuery(makeSingleOrDoubleBondQuery());
+          bond->setProp(common_properties::_MolFileBondQuery, 1);
         } else if (bType == 6) {
           bond->setQuery(makeSingleOrAromaticBondQuery());
           bond->setProp(common_properties::_MolFileBondQuery, 1);
-        } else if (bType == 5 || bType == 7) {
-          BOND_OR_QUERY *q;
-          q = new BOND_OR_QUERY;
-          if (bType == 5) {
-            // single or double
-            q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-                makeBondOrderEqualsQuery(Bond::SINGLE)));
-            q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-                makeBondOrderEqualsQuery(Bond::DOUBLE)));
-            q->setDescription("BondOr");
-          } else if (bType == 7) {
-            // double or aromatic
-            q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-                makeBondOrderEqualsQuery(Bond::DOUBLE)));
-            q->addChild(QueryBond::QUERYBOND_QUERY::CHILD_TYPE(
-                makeBondOrderEqualsQuery(Bond::AROMATIC)));
-            q->setDescription("BondOr");
-          }
+        } else if (bType == 7) {
+          bond->setQuery(makeDoubleOrAromaticBondQuery());
           bond->setProp(common_properties::_MolFileBondQuery, 1);
-          bond->setQuery(q);
         } else {
           BOND_NULL_QUERY *q;
           q = makeBondNullQuery();
@@ -2763,7 +2776,7 @@ bool ParseV3000CTAB(std::istream *inStream, unsigned int &line, RWMol *mol,
   conf = new Conformer(nAtoms);
 
   unsigned int nSgroups = 0, n3DConstraints = 0, chiralFlag = 0;
-  (void)chiralFlag;  // needs to be read
+
   if (splitLine.size() > 2) {
     nSgroups = FileParserUtils::toUnsigned(splitLine[2]);
   }
@@ -2772,6 +2785,10 @@ bool ParseV3000CTAB(std::istream *inStream, unsigned int &line, RWMol *mol,
   }
   if (splitLine.size() > 4) {
     chiralFlag = FileParserUtils::toUnsigned(splitLine[4]);
+  }
+
+  if (chiralFlag) {
+    mol->setProp(common_properties::_MolFileChiralFlag, chiralFlag);
   }
 
   if (nAtoms) {

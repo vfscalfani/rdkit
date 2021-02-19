@@ -18,6 +18,7 @@
 
 #include <DataStructs/ExplicitBitVect.h>
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/MolBundle.h>
 #include <GraphMol/RDKitQueries.h>
 #include <GraphMol/MonomerInfo.h>
 #include <GraphMol/Substruct/SubstructMatch.h>
@@ -30,26 +31,10 @@
 #include <RDBoost/python_streambuf.h>
 
 #include <sstream>
-#include <GraphMol/MolDraw2D/MolDraw2DSVG.h>
 namespace python = boost::python;
 using boost_adaptbx::python::streambuf;
 
 namespace RDKit {
-std::string molToSVG(const ROMol &mol, unsigned int width, unsigned int height,
-                     python::object pyHighlightAtoms, bool kekulize,
-                     unsigned int lineWidthMult,
-                     bool includeAtomCircles, int confId) {
-  RDUNUSED_PARAM(kekulize);
-  std::unique_ptr<std::vector<int>> highlightAtoms =
-      pythonObjectToVect(pyHighlightAtoms, static_cast<int>(mol.getNumAtoms()));
-  std::stringstream outs;
-  MolDraw2DSVG drawer(width, height, outs);
-  drawer.setLineWidth(drawer.lineWidth() * lineWidthMult);
-  drawer.drawOptions().circleAtoms = includeAtomCircles;
-  drawer.drawMolecule(mol, highlightAtoms.get(), nullptr, nullptr, confId);
-  drawer.finishDrawing();
-  return outs.str();
-}
 python::tuple fragmentOnSomeBondsHelper(const ROMol &mol,
                                         python::object pyBondIndices,
                                         unsigned int nToBreak, bool addDummies,
@@ -600,7 +585,8 @@ ExplicitBitVect *wrapPatternFingerprint(const ROMol &mol, unsigned int fpSize,
   }
 
   ExplicitBitVect *res;
-  res = RDKit::PatternFingerprintMol(mol, fpSize, atomCountsV, includeOnlyBits, tautomerFingerprints);
+  res = RDKit::PatternFingerprintMol(mol, fpSize, atomCountsV, includeOnlyBits,
+                                     tautomerFingerprints);
 
   if (atomCountsV) {
     for (unsigned int i = 0; i < atomCountsV->size(); ++i) {
@@ -609,6 +595,15 @@ ExplicitBitVect *wrapPatternFingerprint(const ROMol &mol, unsigned int fpSize,
     delete atomCountsV;
   }
 
+  return res;
+}
+ExplicitBitVect *wrapPatternFingerprintBundle(const MolBundle &bundle,
+                                              unsigned int fpSize,
+                                              ExplicitBitVect *includeOnlyBits,
+                                              bool tautomerFingerprints) {
+  ExplicitBitVect *res;
+  res = RDKit::PatternFingerprintMol(bundle, fpSize, includeOnlyBits,
+                                     tautomerFingerprints);
   return res;
 }
 
@@ -641,7 +636,9 @@ ExplicitBitVect *wrapRDKFingerprintMol(
     auto &pyl = static_cast<python::list &>(atomBits);
     for (unsigned int i = 0; i < mol.getNumAtoms(); ++i) {
       python::list tmp;
-      BOOST_FOREACH (std::uint32_t v, (*lAtomBits)[i]) { tmp.append(v); }
+      for (auto v : (*lAtomBits)[i]) {
+        tmp.append(v);
+      }
       pyl.append(tmp);
     }
     delete lAtomBits;
@@ -697,7 +694,9 @@ SparseIntVect<boost::uint64_t> *wrapUnfoldedRDKFingerprintMol(
     auto &pyl = static_cast<python::list &>(atomBits);
     for (unsigned int i = 0; i < mol.getNumAtoms(); ++i) {
       python::list tmp;
-      BOOST_FOREACH (boost::uint64_t v, (*lAtomBits)[i]) { tmp.append(v); }
+      for (auto v : (*lAtomBits)[i]) {
+        tmp.append(v);
+      }
       pyl.append(tmp);
     }
     delete lAtomBits;
@@ -840,6 +839,14 @@ void setDoubleBondNeighborDirectionsHelper(ROMol &mol, python::object confObj) {
     conf = python::extract<Conformer *>(confObj);
   }
   MolOps::setDoubleBondNeighborDirections(mol, conf);
+}
+
+ROMol *molzip_new(const ROMol &a, const ROMol &b, const MolzipParams &p) {
+  return molzip(a, b, p).release();
+}
+
+ROMol *molzip_new(const ROMol &a, const MolzipParams &p) {
+  return molzip(a, p).release();
 }
 
 struct molops_wrapper {
@@ -1594,12 +1601,12 @@ struct molops_wrapper {
       will be returned as molecules instead of atom ids.\n\
     - sanitizeFrags: (optional) if this is provided and true, the fragments\n\
       molecules will be sanitized before returning them.\n\
-    - frags: (optional, defaults to None) if this is provided as an empty list,\n\
-      the result will be mol.GetNumAtoms() long on return and will contain the\n\
-      fragment assignment for each Atom\n\
-    - fragsMolAtomMapping: (optional, defaults to None) if this is provided as\n\
-      an empty list, the result will be a a numFrags long list on return, and\n\
-      each entry will contain the indices of the Atoms in that fragment:\n\
+    - frags: (optional, defaults to None) if asMols is true and this is provided\n\
+       as an empty list, the result will be mol.GetNumAtoms() long on return and\n\
+       will contain the fragment assignment for each Atom\n\
+    - fragsMolAtomMapping: (optional, defaults to None) if asMols is true and this\n\
+      is provided as an empty list, the result will be numFrags long on \n\
+      return, and each entry will contain the indices of the Atoms in that fragment:\n\
       [(0, 1, 2, 3), (4, 5)]\n\
 \n\
   RETURNS: a tuple of tuples with IDs for the atoms in each fragment\n\
@@ -2011,6 +2018,17 @@ ARGUMENTS:\n\
                 python::return_value_policy<python::manage_new_object>());
     python::scope().attr("_PatternFingerprint_version") =
         RDKit::PatternFingerprintMolVersion;
+    docString =
+        "A fingerprint using SMARTS patterns \n\
+\n\
+  NOTE: This function is experimental. The API or results may change from\n\
+    release to release.\n";
+    python::def("PatternFingerprint", wrapPatternFingerprintBundle,
+                (python::arg("mol"), python::arg("fpSize") = 2048,
+                 python::arg("setOnlyBits") = (ExplicitBitVect *)nullptr,
+                 python::arg("tautomerFingerprints") = false),
+                docString.c_str(),
+                python::return_value_policy<python::manage_new_object>());
 
     docString =
         "Set the wedging on single bonds in a molecule.\n\
@@ -2258,6 +2276,75 @@ EXAMPLES:\n\n\
          python::arg("returnCutsPerAtom") = false),
         docString.c_str());
 
+    python::enum_<MolzipLabel>("MolzipLabel")
+        .value("AtomMapNumber", MolzipLabel::AtomMapNumber)
+        .value("Isotope", MolzipLabel::Isotope)
+        .value("FragmentOnBonds", MolzipLabel::FragmentOnBonds)
+        .value("AtomType", MolzipLabel::AtomType);
+
+    docString =
+        "Parameters controllnig how to zip molecules together\n\
+\n\
+  OPTIONS:\n\
+      label : set the MolzipLabel option [default MolzipLabel.AtomMapNumber]\n\
+\n\
+  MolzipLabel.AtomMapNumber: atom maps are on dummy atoms, zip together the corresponding\n\
+     attaced atoms, i.e.  zip 'C[*:1]' 'N[*:1]' results in 'CN'\n\
+\n\
+  MolzipLabel.Isotope: isotope labels are on dummy atoms, zip together the corresponding\n\
+     attaced atoms, i.e.  zip 'C[1*]' 'N[1*]' results in 'CN'\n\
+\n\
+  MolzipLabel.FragmentOnBonds: zip together molecules generated by fragment on bonds.\n\
+    Note the atom indices cannot change or be reorderd from the output of fragmentOnBonds\n\
+\n\
+  MolzipLabel.AtomTypes: choose the atom types to act as matching dummy atoms.\n\
+    i.e.  'C[V]' and 'N[Xe]' with atoms pairs [('V', 'Xe')] results in 'CN'\n\
+";
+
+    python::class_<MolzipParams>("MolzipParams", docString.c_str(),
+                                 python::init<>())
+        .def_readwrite("label", &MolzipParams::label,
+                       "Set the atom labelling system to zip together");
+
+    docString =
+        "molzip: zip two molecules together preserving bond and atom stereochemistry.\n\
+\n\
+This is useful when dealing with results from fragmentOnBonds, RGroupDecomposition and MMPs.\n\
+\n\
+Example:\n\
+    >>> from rdkit.Chem import MolFromSmiles,  MolToSmiles, molzip\n\
+    >>> a = MolFromSmiles('C=C[*:1]')\n\
+    >>> b = MolFromSmiles('O/C=N/[*:1]')\n\
+    >>> c = molzip(a,b)\n\
+    >>> MolToSmiles(c)\n\
+    'C=C/N=C/O'\n\
+\n\
+The atoms to zip can be specified with the MolzipParams class.\n\
+    >>> from rdkit.Chem import MolzipParams, MolzipLabel\n\
+    >>> a = MolFromSmiles('C=C[1*]')\n\
+    >>> b = MolFromSmiles('O/C=N/[1*]')\n\
+    >>> p = MolzipParams()\n\
+    >>> p.label = MolzipLabel.Isotope\n\
+    >>> c = molzip(a,b, p)\n\
+    >>> MolToSmiles(c)\n\
+    'C=C/N=C/O'\n\
+";
+    python::def(
+        "molzip",
+        (ROMol * (*)(const ROMol &, const ROMol &, const MolzipParams &)) &
+            molzip_new,
+        (python::arg("a"), python::arg("b"),
+         python::arg("params") = MolzipParams()),
+        "zip together two molecules using the given matching parameters",
+        python::return_value_policy<python::manage_new_object>());
+
+    python::def(
+        "molzip",
+        (ROMol * (*)(const ROMol &, const MolzipParams &)) & molzip_new,
+        (python::arg("a"), python::arg("params") = MolzipParams()),
+        "zip together two molecules using the given matching parameters",
+        python::return_value_policy<python::manage_new_object>());
+
     // ------------------------------------------------------------------------
     docString =
         "Adds a recursive query to an atom\n\
@@ -2297,17 +2384,6 @@ EXAMPLES:\n\n\
                 (python::arg("mol"), python::arg("newOrder")),
                 docString.c_str(),
                 python::return_value_policy<python::manage_new_object>());
-
-    // ------------------------------------------------------------------------
-    docString = "Returns svg for a molecule";
-    python::def("MolToSVG", molToSVG,
-                (python::arg("mol"), python::arg("width") = 300,
-                 python::arg("height") = 300,
-                 python::arg("highlightAtoms") = python::object(),
-                 python::arg("kekulize") = true,
-                 python::arg("lineWidthMult") = 1, python::arg("fontSize") = 12,
-                 python::arg("includeAtomCircles") = true),
-                docString.c_str());
 
     docString =
         R"DOC(Possible values:

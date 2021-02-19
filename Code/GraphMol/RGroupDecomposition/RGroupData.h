@@ -14,11 +14,12 @@
 #include "RGroupUtils.h"
 #include <GraphMol/SmilesParse/SmilesWrite.h>  
 #include <GraphMol/Substruct/SubstructMatch.h>
-#include <GraphMol/ChemTransforms/ChemTransforms.h> 
+#include <GraphMol/ChemTransforms/ChemTransforms.h>
+#include <DataStructs/ExplicitBitVect.h>
 #include <boost/scoped_ptr.hpp>
 #include <set>
 #include <vector>
-
+#include <regex>
 
 namespace RDKit
 {
@@ -27,9 +28,11 @@ namespace RDKit
 struct RGroupData {
   boost::shared_ptr<RWMol> combinedMol;
   std::vector<boost::shared_ptr<ROMol>> mols;  // All the mols in the rgroup
-  std::set<std::string> smilesSet;             // used for rgroup equivalence
+  std::vector<std::string> smilesVect;         // used for rgroup equivalence
   std::string smiles;                          // smiles for all the mols in the rgroup (with attachments)
   std::set<int> attachments;                   // core attachment points
+  std::unique_ptr<ExplicitBitVect> fingerprint;  // fingerprint for score calculations
+  std::vector<int> fingerprintOnBits;
   bool is_hydrogen = false;
   bool single_fragment = true;
   bool multiple_attachments = false;
@@ -40,7 +43,7 @@ struct RGroupData {
   RGroupData(const RGroupData &rhs);
 
  public:
-  RGroupData() : combinedMol(), mols(), smilesSet(), smiles(), attachments() {}
+  RGroupData() {}
 
   void add(boost::shared_ptr<ROMol> newMol,
            const std::vector<int> &rlabel_attachments) {
@@ -56,10 +59,12 @@ struct RGroupData {
               std::inserter(attachments, attachments.end()));
 
     mols.push_back(newMol);
-    std::string smi = MolToSmiles(*newMol, true);
-    // REVIEW: we probably shouldn't be using a set here... the merging of
-    // duplicates is likely not what we want
-    smilesSet.insert(smi);
+    static const std::regex remove_isotopes_regex("\\[\\d*\\*\\]");
+    // remove the isotope labels from the SMILES string to avoid
+    // that identical R-group are perceived as different when
+    // MCS alignment is not used (NoAlign flag)
+    smilesVect.push_back(std::regex_replace(MolToSmiles(*newMol, true),
+                                            remove_isotopes_regex, "*"));
     if (!combinedMol.get()) {
       combinedMol = boost::shared_ptr<RWMol>(new RWMol(*mols[0].get()));
     } else {
@@ -106,7 +111,7 @@ struct RGroupData {
   //! compute the canonical smiles for the attachments (bug: removes dupes since we are using a set...)
   std::string getSmiles() const {
     std::string s;
-    for (const auto &it : smilesSet) {
+    for (const auto &it : smilesVect) {
       if (s.length()) {
         s += ".";
       }
