@@ -89,11 +89,20 @@ bool setLabel(Atom *atom, int label, std::set<int> &labels, int &maxLabel,
     }
 
     atom->setProp<int>(RLABEL, label);
+    atom->setProp<int>(RLABEL_TYPE, static_cast<int>(type));
     labels.insert(label);
     maxLabel = (std::max)(maxLabel, label + 1);
     return true;
   }
   return false;
+}
+
+bool isAtomWithMultipleNeighborsOrNotUserRLabel(const Atom &atom) {
+  if (atom.getDegree() > 1) return true;
+  auto userRLabel = atom.hasProp(RLABEL) && atom.hasProp(RLABEL_TYPE) &&
+                    static_cast<Labelling>(atom.getProp<int>(RLABEL_TYPE)) !=
+                        Labelling::INDEX_LABELS;
+  return !userRLabel;
 }
 
 bool hasDummy(const RWMol &core) {
@@ -146,7 +155,7 @@ std::string toJSON(const RGroupRow &rgr, const std::string &prefix) {
 std::string toJSON(const RGroupRows &rows, const std::string &prefix) {
   std::string res = prefix + "[\n";
   auto rowPrefix = prefix + "  ";
-  for (const auto row : rows) {
+  for (const auto &row : rows) {
     res += toJSON(row, rowPrefix) + ",\n";
   }
   res.erase(res.end() - 2, res.end());
@@ -168,7 +177,7 @@ std::string toJSON(const RGroupColumn &rgr, const std::string &prefix) {
 std::string toJSON(const RGroupColumns &cols, const std::string &prefix) {
   std::string res = prefix + "[\n";
   auto colPrefix = prefix + "  ";
-  for (const auto col : cols) {
+  for (const auto &col : cols) {
     auto fmt = boost::format{"  \"%1%\": %2%"} % (col.first) %
                (toJSON(col.second, colPrefix));
     res += prefix + fmt.str() + ",\n";

@@ -807,7 +807,7 @@ struct ZipBond {
         std::vector<Atom *> atoms;
         bool has_dummy = false;
         for (auto idx : bond->getStereoAtoms()) {
-          if (idx == dummy_atom->getIdx()) {
+          if (static_cast<unsigned>(idx) == dummy_atom->getIdx()) {
             atoms.push_back(new_atom);
             has_dummy = true;
           } else {
@@ -924,11 +924,13 @@ std::unique_ptr<ROMol> molzip(const ROMol &a, const ROMol &b,
   for (auto &kv : mappings) {
     kv.second.bond(*newmol);
   }
+  newmol->beginBatchEdit();
   for (auto &atom : deletions) {
     if (atom->hasProp("__molzip_used")) {
       newmol->removeAtom(atom);
     }
   }
+  newmol->commitBatchEdit();
 
   std::set<Atom *> already_checked;
   for (auto &kv : mappings_by_atom) {

@@ -675,7 +675,8 @@ bool _atomListQueryHelper(const T query) {
   if (query->getNegation()) {
     return false;
   }
-  if (query->getDescription() == "AtomAtomicNum") {
+  if (query->getDescription() == "AtomAtomicNum" ||
+      query->getDescription() == "AtomType") {
     return true;
   }
   if (query->getDescription() == "AtomOr") {
@@ -695,7 +696,7 @@ bool isAtomListQuery(const Atom *a) {
     return false;
   }
   if (a->getQuery()->getDescription() == "AtomOr") {
-    for (const auto child : boost::make_iterator_range(
+    for (const auto &child : boost::make_iterator_range(
              a->getQuery()->beginChildren(), a->getQuery()->endChildren())) {
       if (!_atomListQueryHelper(child)) {
         return false;
@@ -713,18 +714,27 @@ void getAtomListQueryVals(const Atom::QUERYATOM_QUERY *q,
   auto descr = q->getDescription();
   PRECONDITION(descr == "AtomOr", "bad query");
   if (descr == "AtomOr") {
-    for (const auto child :
+    for (const auto &child :
          boost::make_iterator_range(q->beginChildren(), q->endChildren())) {
       auto descr = child->getDescription();
       if (child->getNegation() ||
-          (descr != "AtomOr" && descr != "AtomAtomicNum")) {
-        throw ValueErrorException("bad query type");
+          (descr != "AtomOr" && descr != "AtomAtomicNum" &&
+           descr != "AtomType")) {
+        throw ValueErrorException("bad query type1");
       }
       // we don't allow negation of any children of the query:
       if (descr == "AtomOr") {
         getAtomListQueryVals(child.get(), vals);
       } else if (descr == "AtomAtomicNum") {
         vals.push_back(static_cast<ATOM_EQUALS_QUERY *>(child.get())->getVal());
+      } else if (descr == "AtomType") {
+        auto v = static_cast<ATOM_EQUALS_QUERY *>(child.get())->getVal();
+        // aromatic AtomType queries subtract 1000 from the atomic number;
+        // correct for that:
+        if (v < 0) {
+          v += 1000;
+        }
+        vals.push_back(v);
       }
     }
   }
